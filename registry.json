@@ -1,0 +1,15 @@
+{
+  "plugins": [
+    {
+      "name": "image-gen-fal",
+      "version": "0.1.0",
+      "description": "Generate images from text prompts using fal.ai Flux models",
+      "author": "ZeroClaw Labs",
+      "capabilities": [
+        "tool"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/image-gen-fal-0.1.0.zip",
+      "sha256": "7744837857e89fc2a3b0a25f34642221e6f92931a1434b606f2e6bc8202a99fa"
+    }
+  ]
+}

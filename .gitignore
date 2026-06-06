@@ -1,0 +1,5 @@
+dist/
+staged/
+zeroclaw/
+__pycache__/
+*.pyc
