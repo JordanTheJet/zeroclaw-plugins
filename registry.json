@@ -9,7 +9,7 @@
         "tool"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/image-gen-fal-0.1.0.zip",
-      "sha256": "dd2b97d07192b2184cbedf1fadb213d4146452b5a0e34f981c044840fe925737"
+      "sha256": "5fac62a59e17bcd1dbcfd8223f7ea320885140991723e68ca39b76e601feed3f"
     },
     {
       "name": "languagetool",
@@ -20,7 +20,7 @@
         "tool"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/languagetool-0.1.0.zip",
-      "sha256": "919022437626648242035d34704dfe963addcaee20fe7731ff7ae0231062c061"
+      "sha256": "8ac6cd8d2ddb68917325dc07ffa96941f990b22fd9c4ee25f7bab6eb048cf152"
     },
     {
       "name": "office-tools",
@@ -31,7 +31,7 @@
         "tool"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/office-tools-0.1.0.zip",
-      "sha256": "7ac76581d0dfeb44cd6a6daa77e384ab09ee910fb8b970db1261b28643322415"
+      "sha256": "2359d72d8dc78b776571653f2c7425249d1d55a1cbd23b4f25b6e333000a2ad4"
     },
     {
       "name": "sd-webui",
@@ -42,7 +42,7 @@
         "tool"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/sd-webui-0.1.0.zip",
-      "sha256": "7fe2e91c730f7071fdbfe31edc057e33cc388079916dc268c4b6d671fa915a20"
+      "sha256": "0e572aa8d98f887d6ca864b9e833520e81d51bb7077cf5a947060896ae78b82d"
     }
   ]
 }
