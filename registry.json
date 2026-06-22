@@ -9,18 +9,7 @@
         "tool"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mastodon-post-0.1.0.zip",
-      "sha256": "ed9d2791ff756cc3b99bb4dacdcd10ede5a1798ee0d3d5c8ed51d596cfafa970"
-    },
-    {
-      "name": "wikipedia-summary",
-      "version": "0.1.0",
-      "description": "Look up a short factual summary of a topic from Wikipedia",
-      "author": "ZeroClaw Labs",
-      "capabilities": [
-        "tool"
-      ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wikipedia-summary-0.1.0.zip",
-      "sha256": "11a3ccf41c5097669292f0d7c8340d65f9285950953bef01272a09dd005ff88e"
+      "sha256": "e3c8b430858fbcce7ca8675dcd48bef320cf3d6c93689b6e8771a3a9ac4daad8"
     }
   ]
 }

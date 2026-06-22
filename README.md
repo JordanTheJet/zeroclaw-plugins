@@ -6,9 +6,9 @@ on demand. This is what `zeroclaw plugin search` and
 `zeroclaw plugin install <name>` read by default.
 
 ```bash
-zeroclaw plugin search wikipedia
-zeroclaw plugin install wikipedia-summary
-zeroclaw plugin install wikipedia-summary@0.1.0    # pin a version
+zeroclaw plugin search mastodon
+zeroclaw plugin install mastodon-post
+zeroclaw plugin install mastodon-post@0.1.0    # pin a version
 ```
 
 ## What's in this repo
@@ -46,12 +46,12 @@ host grants only the capabilities a plugin's `manifest.toml` declares.
 {
   "plugins": [
     {
-      "name": "wikipedia-summary",
+      "name": "mastodon-post",
       "version": "0.1.0",
-      "description": "Look up a short factual summary of a topic from Wikipedia",
+      "description": "Post a status (toot) to a Mastodon instance",
       "author": "ZeroClaw Labs",
       "capabilities": ["tool"],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wikipedia-summary-0.1.0.zip",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mastodon-post-0.1.0.zip",
       "sha256": "<hex digest of the zip>"
     }
   ]
@@ -67,8 +67,7 @@ release, and commits a refreshed index. The checked-in copy is a seed; the
 
 1. Create `plugins/<your-plugin>/` with `Cargo.toml` (cdylib + `wit-bindgen`),
    `src/lib.rs` implementing the `tool-plugin` world, and a `manifest.toml`. Use
-   `plugins/wikipedia-summary` (no auth) and `plugins/mastodon-post`
-   (host-injected credentials) as templates.
+   `plugins/mastodon-post` (host-injected credentials) as a template.
 2. Build it:
    ```bash
    rustup target add wasm32-wasip2
