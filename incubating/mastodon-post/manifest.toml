@@ -6,7 +6,10 @@ wasm_path = "mastodon_post.wasm"
 capabilities = ["tool"]
 # http_client to reach the instance; secret_exists so the guest can confirm the
 # token is configured (it can never read the value).
-permissions = ["http_client", "secret_exists"]
+# NOTE: `secret_exists` is part of the proposed host capability interface
+# (../wit/v0/host.wit) and is not yet a valid host permission — only
+# `http_client` parses against the current PluginManifest schema.
+permissions = ["http_client"]
 
 # Host-injected credential: the host adds `Authorization: Bearer <MASTODON_TOKEN>`
 # to outbound requests; the WASM guest never sees the token value. The token is

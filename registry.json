@@ -1,26 +1,15 @@
 {
   "plugins": [
     {
-      "name": "mastodon-post",
+      "name": "redact-text",
       "version": "0.1.0",
-      "description": "Post a status (toot) to a Mastodon instance",
+      "description": "Redact secrets and PII from text: emails, bearer/API tokens, and configured patterns",
       "author": "ZeroClaw Labs",
       "capabilities": [
         "tool"
       ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mastodon-post-0.1.0.zip",
-      "sha256": "3779f79561e842f491359f43fd658185d6c277fe45a9873f3087440c8b40a6d2"
-    },
-    {
-      "name": "wikipedia-summary",
-      "version": "0.1.0",
-      "description": "Look up a short factual summary of a topic from Wikipedia",
-      "author": "ZeroClaw Labs",
-      "capabilities": [
-        "tool"
-      ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wikipedia-summary-0.1.0.zip",
-      "sha256": "fcdbad77ed2cafbdc31629fba2e7c84606c492dcb71d3a3b2fd12d3f9947ab32"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
+      "sha256": "5967830d0e60186b5b7108e0685cefd4900ddb568e0914bd54b438f1bbefc809"
     }
   ]
 }

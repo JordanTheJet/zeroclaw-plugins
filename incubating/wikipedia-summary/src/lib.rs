@@ -12,7 +12,7 @@
 
 wit_bindgen::generate!({
     world: "tool-plugin",
-    path: "../../wit/v0",
+    path: "../wit/v0",
     features: ["plugins-wit-v0"],
 });
 

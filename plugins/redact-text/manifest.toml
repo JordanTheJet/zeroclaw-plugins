@@ -1,0 +1,10 @@
+name = "redact-text"
+version = "0.1.0"
+description = "Redact secrets and PII from text: emails, bearer/API tokens, and configured patterns"
+author = "ZeroClaw Labs"
+wasm_path = "redact_text.wasm"
+capabilities = ["tool"]
+# config_read: the host injects this plugin's own config section (replacement,
+# redact_emails, patterns) into execute args as `__config`. Without it the
+# plugin still works with defaults.
+permissions = ["config_read"]
