@@ -39,7 +39,6 @@ interface tool {
 @unstable(feature = plugins-wit-v0)
 world tool-plugin {
     import logging;
-    import host;
     export plugin-info;
     export tool;
 }

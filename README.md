@@ -6,18 +6,20 @@ on demand. This is what `zeroclaw plugin search` and
 `zeroclaw plugin install <name>` read by default.
 
 ```bash
-zeroclaw plugin search wikipedia
-zeroclaw plugin install wikipedia-summary
-zeroclaw plugin install wikipedia-summary@0.1.0    # pin a version
+zeroclaw plugin search redact
+zeroclaw plugin install redact-text
+zeroclaw plugin install redact-text@0.1.0    # pin a version
 ```
 
 ## What's in this repo
 
 ```
-plugins/<name>/        # one wit-bindgen component per directory
-  Cargo.toml           # cdylib + wit-bindgen, standalone [workspace]
-  src/lib.rs           # implements the `tool-plugin` WIT world
-  manifest.toml        # name, version, capabilities, permissions, [[credentials]]
+plugins/<name>/        # published plugins — one wit-bindgen component per directory
+  Cargo.toml           # cdylib + rlib, wit-bindgen, standalone [workspace]
+  src/lib.rs           # thin #[cfg(target_family = "wasm")] component shim
+  src/<core>.rs        # pure logic, no wasm deps — host-testable
+  tests/               # host-run tests over the pure core (`cargo test`)
+  manifest.toml        # name, version, wasm_path, capabilities, permissions
   README.md
 wit/v0/                # vendored ZeroClaw plugin WIT contract (the ABI plugins build against)
 registry.json          # GENERATED index — published by CI, do not hand-edit
@@ -28,6 +30,12 @@ tools/build-registry.py
 Plugins are **WebAssembly components** built for `wasm32-wasip2` against the WIT
 world `tool-plugin` (`wit/v0/`). They run sandboxed and deny-by-default: the
 host grants only the capabilities a plugin's `manifest.toml` declares.
+
+`wit/v0/` is vendored **unmodified** from
+[zeroclaw `wit/v0`](https://github.com/zeroclaw-labs/zeroclaw/tree/master/wit/v0)
+— it is the contract the host actually implements. Plugins requiring host
+capabilities beyond it (e.g. HTTP egress) are blocked on the upstream host
+capability interface ([zeroclaw#8135](https://github.com/zeroclaw-labs/zeroclaw/issues/8135)).
 
 ## How install works
 
@@ -46,12 +54,12 @@ host grants only the capabilities a plugin's `manifest.toml` declares.
 {
   "plugins": [
     {
-      "name": "wikipedia-summary",
+      "name": "redact-text",
       "version": "0.1.0",
-      "description": "Look up a short factual summary of a topic from Wikipedia",
+      "description": "Redact secrets and PII from text: emails, bearer/API tokens, and configured patterns",
       "author": "ZeroClaw Labs",
       "capabilities": ["tool"],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wikipedia-summary-0.1.0.zip",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
       "sha256": "<hex digest of the zip>"
     }
   ]
@@ -65,28 +73,35 @@ release, and commits a refreshed index. The checked-in copy is a seed; the
 
 ## Add a plugin
 
-1. Create `plugins/<your-plugin>/` with `Cargo.toml` (cdylib + `wit-bindgen`),
-   `src/lib.rs` implementing the `tool-plugin` world, and a `manifest.toml`. Use
-   `plugins/wikipedia-summary` (no auth) and `plugins/mastodon-post`
-   (host-injected credentials) as templates.
-2. Build it:
+Start with the **plugin authoring guide series** in the ZeroClaw book
+([`docs/book/src/plugins/`](https://github.com/zeroclaw-labs/zeroclaw/tree/master/docs/book/src/plugins),
+added in [zeroclaw#8621](https://github.com/zeroclaw-labs/zeroclaw/pull/8621)) —
+worked guides for tool, channel, and memory plugins plus distribution and
+signing, with every claim derived from `wit/v0/` and the host source.
+
+Then use [`plugins/redact-text`](./plugins/redact-text) as the template — it is
+the canonical reference plugin (adopted from
+[zeroclaw-reference-plugin](https://github.com/singlerider/zeroclaw-reference-plugin))
+and its layout is the required format:
+
+1. **Pure core, thin shim.** Keep the actual logic in a plain Rust module with
+   no wasm dependency; implement the `tool-plugin` world in a
+   `#[cfg(target_family = "wasm")]` module that calls into it. Crate type
+   `["cdylib", "rlib"]`.
+2. **Host-run tests.** `tests/` must exercise the core with a plain
+   `cargo test` — no wasm toolchain needed to validate behavior.
+3. **Structured logging.** Emit through the `logging` import (`log-record`), not
+   stdout.
+4. **Manifest.** `manifest.toml` with `name` (kebab-case, says what it does),
+   `version`, `wasm_path`, `capabilities`, and only permissions the host
+   actually supports (`http_client`, `file_read`, `file_write`, `config_read`,
+   `memory_read`, `memory_write`).
+5. Build it:
    ```bash
    rustup target add wasm32-wasip2
-   (cd plugins/<name> && cargo build --target wasm32-wasip2 --release)
+   (cd plugins/<name> && cargo test && cargo build --target wasm32-wasip2 --release)
    ```
-3. Open a PR. On merge, the publish workflow packages and indexes it.
-
-The contract in `wit/v0/` is vendored from
-[zeroclaw `wit/v0`](https://github.com/zeroclaw-labs/zeroclaw/tree/master/wit/v0);
-bump it together when the plugin ABI version changes.
-
-## Secrets / credentials
-
-A plugin never sees secret values. It declares `[[credentials]]` in its
-`manifest.toml`, and the host injects the secret into matching outbound requests
-(e.g. `Authorization: Bearer <token>`) at the HTTP boundary — see
-`plugins/mastodon-post`. The plugin can only check existence via the
-`secret_exists` permission.
+6. Open a PR. On merge, the publish workflow packages and indexes it.
 
 ## Run your own registry
 
