@@ -73,8 +73,14 @@ release, and commits a refreshed index. The checked-in copy is a seed; the
 
 ## Add a plugin
 
-Use [`plugins/redact-text`](./plugins/redact-text) as the template — it is the
-canonical reference plugin (adopted from
+Start with the **plugin authoring guide series** in the ZeroClaw book
+([`docs/book/src/plugins/`](https://github.com/zeroclaw-labs/zeroclaw/tree/master/docs/book/src/plugins),
+added in [zeroclaw#8621](https://github.com/zeroclaw-labs/zeroclaw/pull/8621)) —
+worked guides for tool, channel, and memory plugins plus distribution and
+signing, with every claim derived from `wit/v0/` and the host source.
+
+Then use [`plugins/redact-text`](./plugins/redact-text) as the template — it is
+the canonical reference plugin (adopted from
 [zeroclaw-reference-plugin](https://github.com/singlerider/zeroclaw-reference-plugin))
 and its layout is the required format:
 
