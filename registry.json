@@ -1,6 +1,28 @@
 {
   "plugins": [
     {
+      "name": "bluesky",
+      "version": "0.1.0",
+      "description": "Bluesky (AT Protocol) channel plugin for ZeroClaw: notification poll + threaded post replies over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/bluesky-0.1.0.zip",
+      "sha256": "4771ffbead2767dc7bc158788a257646847c96bbaff862bfea2766e5f6725d52"
+    },
+    {
+      "name": "mattermost",
+      "version": "0.1.0",
+      "description": "Mattermost channel plugin for ZeroClaw: v4 REST channel-post polling + createPost over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/mattermost-0.1.0.zip",
+      "sha256": "895aaaf1d809a90fcace5152dbb35885f48828410d5f4116693524d8594f9174"
+    },
+    {
       "name": "redact-text",
       "version": "0.1.0",
       "description": "Redact secrets and PII from text: emails, bearer/API tokens, and configured patterns",
@@ -9,7 +31,7 @@
         "tool"
       ],
       "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
-      "sha256": "e722235dbab09bd47c4d28af7012ca92a80f958bb24bd52f552304ebeb5c5c52"
+      "sha256": "49ddbf35287acb96672e0bfa1f410e59432324a65d41792a0dc1bae8219097e6"
     },
     {
       "name": "telegram",
@@ -20,7 +42,18 @@
         "channel"
       ],
       "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/telegram-0.1.0.zip",
-      "sha256": "9ef6a14eacecd53ba6c6dc58f7f020178391798f1e99bdea89b287ac36977f51"
+      "sha256": "0d090da54cde61d226615e1b197908ec65bc0543e1378484c17cf1ecf288582e"
+    },
+    {
+      "name": "twitter",
+      "version": "0.1.0",
+      "description": "X/Twitter channel plugin for ZeroClaw: mentions polling + reply tweets over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/twitter-0.1.0.zip",
+      "sha256": "1bac6ddfa09bf91d691ba96bfa75674c78e6fc0a9e44b69e636f506fd937d899"
     }
   ]
 }

@@ -1,0 +1,14 @@
+name = "twitter"
+version = "0.1.0"
+description = "X/Twitter channel plugin for ZeroClaw: mentions polling + reply tweets over wasi:http."
+author = "JordanTheJet"
+wasm_path = "twitter.wasm"
+capabilities = ["channel"]
+# http_client: outbound calls to api.x.com (TLS is performed host-side).
+# config_read: read the bearer token + settings from this channel's config section.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `twitter` channel — read [channels.twitter.*]
+# and honor native-wins. Inert on hosts without the `provides` feature (they
+# load this as a novel channel named `twitter`, configured from
+# [[plugins.entries.twitter]]).
+provides = "twitter"

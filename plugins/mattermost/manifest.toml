@@ -1,0 +1,14 @@
+name = "mattermost"
+version = "0.1.0"
+description = "Mattermost channel plugin for ZeroClaw: v4 REST channel-post polling + createPost over wasi:http."
+author = "JordanTheJet"
+wasm_path = "mattermost.wasm"
+capabilities = ["channel"]
+# http_client: outbound calls to the Mattermost server (TLS is performed host-side).
+# config_read: read the server URL + bot token + channel from this channel's config section.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `mattermost` channel — read [channels.mattermost.*]
+# and honor native-wins. Inert on hosts without the `provides` feature (they
+# load this as a novel channel named `mattermost`, configured from
+# [[plugins.entries.mattermost]]).
+provides = "mattermost"
