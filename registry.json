@@ -8,8 +8,19 @@
       "capabilities": [
         "tool"
       ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
-      "sha256": "e722235dbab09bd47c4d28af7012ca92a80f958bb24bd52f552304ebeb5c5c52"
+      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
+      "sha256": "49ddbf35287acb96672e0bfa1f410e59432324a65d41792a0dc1bae8219097e6"
+    },
+    {
+      "name": "telegram",
+      "version": "0.1.0",
+      "description": "Telegram channel plugin for ZeroClaw: getUpdates long-poll + sendMessage over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/telegram-0.1.0.zip",
+      "sha256": "0d090da54cde61d226615e1b197908ec65bc0543e1378484c17cf1ecf288582e"
     }
   ]
 }
