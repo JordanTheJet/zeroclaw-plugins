@@ -1,0 +1,15 @@
+name = "notion"
+version = "0.1.0"
+description = "Notion task-queue channel plugin for ZeroClaw: poll a database for pending tasks and write results back over wasi:http."
+author = "JordanTheJet"
+wasm_path = "notion.wasm"
+capabilities = ["channel"]
+# http_client: outbound calls to api.notion.com (TLS is performed host-side).
+# config_read: read the integration token + database id + property names from
+# this channel's config section.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `notion` channel — read [channels.notion.*] and
+# honor native-wins. Inert on hosts without the `provides` feature (they load
+# this as a novel channel named `notion`, configured from
+# [[plugins.entries.notion]]).
+provides = "notion"

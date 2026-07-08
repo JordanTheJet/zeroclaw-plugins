@@ -1,0 +1,16 @@
+name = "wechat"
+version = "0.1.0"
+description = "WeChat (iLink Bot) channel plugin for ZeroClaw: getUpdates long-poll + sendMessage over wasi:http."
+author = "JordanTheJet"
+wasm_path = "wechat.wasm"
+capabilities = ["channel"]
+# http_client: outbound calls to the iLink Bot API (ilinkai.weixin.qq.com; TLS
+# is performed host-side).
+# config_read: read the channel settings + iLink session token from this
+# channel's config section.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `wechat` channel — read [channels.wechat.*] and
+# honor native-wins. Inert on hosts without the `provides` feature (they load
+# this as a novel channel named `wechat`, configured from
+# [[plugins.entries.wechat]]).
+provides = "wechat"
