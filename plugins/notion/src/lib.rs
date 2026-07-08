@@ -345,6 +345,17 @@ mod component {
         fn supports_free_form_ask() -> bool {
             true
         }
+
+        fn webhook_path() -> Option<String> {
+            None
+        }
+
+        fn parse_webhook(
+            _headers: Vec<(String, String)>,
+            _body: Vec<u8>,
+        ) -> Result<Vec<InboundMessage>, String> {
+            Err("this channel does not serve webhooks".to_string())
+        }
     }
 
     export!(NotionChannel);
