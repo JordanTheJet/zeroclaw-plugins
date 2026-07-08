@@ -9,7 +9,7 @@
         "channel"
       ],
       "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/bluesky-0.1.0.zip",
-      "sha256": "4771ffbead2767dc7bc158788a257646847c96bbaff862bfea2766e5f6725d52"
+      "sha256": "927c4f15fc1085dc7606ac8349a572fadbd6e1060f31b78fcc0389d2ef3cf578"
     },
     {
       "name": "mattermost",
@@ -20,7 +20,7 @@
         "channel"
       ],
       "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/mattermost-0.1.0.zip",
-      "sha256": "895aaaf1d809a90fcace5152dbb35885f48828410d5f4116693524d8594f9174"
+      "sha256": "200592cc3d51b767b54e846f5c5bf6e7789e1824a450752b5fb23588b51ebfab"
     },
     {
       "name": "redact-text",
@@ -31,7 +31,7 @@
         "tool"
       ],
       "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
-      "sha256": "49ddbf35287acb96672e0bfa1f410e59432324a65d41792a0dc1bae8219097e6"
+      "sha256": "e722235dbab09bd47c4d28af7012ca92a80f958bb24bd52f552304ebeb5c5c52"
     },
     {
       "name": "telegram",
@@ -42,7 +42,7 @@
         "channel"
       ],
       "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/telegram-0.1.0.zip",
-      "sha256": "0d090da54cde61d226615e1b197908ec65bc0543e1378484c17cf1ecf288582e"
+      "sha256": "9ef6a14eacecd53ba6c6dc58f7f020178391798f1e99bdea89b287ac36977f51"
     },
     {
       "name": "twitter",
@@ -53,7 +53,7 @@
         "channel"
       ],
       "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/twitter-0.1.0.zip",
-      "sha256": "1bac6ddfa09bf91d691ba96bfa75674c78e6fc0a9e44b69e636f506fd937d899"
+      "sha256": "af6313c3b7317d108fb7cea2568afcc174446d72c177d5921bd0874f98ea1fa9"
     }
   ]
 }
