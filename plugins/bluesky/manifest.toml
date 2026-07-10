@@ -1,0 +1,15 @@
+name = "bluesky"
+version = "0.1.0"
+description = "Bluesky (AT Protocol) channel plugin for ZeroClaw: notification poll + threaded post replies over wasi:http."
+author = "JordanTheJet"
+wasm_path = "bluesky.wasm"
+capabilities = ["channel"]
+# http_client: outbound XRPC calls to the PDS (bsky.social by default; TLS is
+# performed host-side).
+# config_read: read the handle + app password from this channel's config section.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `bluesky` channel — read [channels.bluesky.*]
+# and honor native-wins. Inert on hosts without the `provides` feature (they
+# load this as a novel channel named `bluesky`, configured from
+# [[plugins.entries.bluesky]]).
+provides = "bluesky"

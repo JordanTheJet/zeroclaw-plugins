@@ -137,12 +137,23 @@ interface channel {
         request-approval,
         request-choice,
         supports-free-form-ask,
+        // Serves inbound webhooks: exports `webhook-path` + `parse-webhook`.
+        webhook-ingress,
     }
 
     // ── Required methods (no Rust default) ────────────────────────────────────
 
     /// Human-readable channel name.
     name: func() -> string;
+
+    /// Hand the plugin its resolved configuration section once at load time,
+    /// before any other call. `config` is a JSON object of the plugin's own
+    /// `[channels.<type>.<alias>]` settings, including secrets the host has
+    /// already decrypted. It is supplied only when the manifest grants
+    /// `config-read`; otherwise the host passes `"{}"`. This mirrors the
+    /// `__config` injection tool plugins receive, so a channel never has to
+    /// hardcode its field names into a host surface to be configured.
+    configure: func(config: string) -> result<_, string>;
 
     /// Send a message through this channel.
     send: func(message: send-message) -> result<_, string>;
@@ -293,11 +304,32 @@ interface channel {
     /// `ask-user` questions via the standard send + poll flow.
     /// Stub: return `true`.
     supports-free-form-ask: func() -> bool;
+
+    /// The URL path segment this channel serves inbound webhooks on, e.g.
+    /// `"whatsapp"`. The host mounts it under a fixed `/plugin/<segment>` prefix
+    /// on the gateway — disjoint from every native channel route, so a plugin
+    /// path can never shadow a built-in one. `none` = a poll-only channel.
+    /// Called once at load time.
+    /// Gated by `webhook-ingress`; stub: return `none`.
+    webhook-path: func() -> option<string>;
+
+    /// Decode a raw inbound webhook the host received at this channel's
+    /// `/plugin/<segment>` route into inbound messages. The plugin owns both its
+    /// platform payload shape and its authenticity check: it verifies the
+    /// platform signature over `body` (secret from its own config, signature
+    /// from `headers`) and returns `err(reason)` to make the gateway reply
+    /// 401/400 and enqueue nothing. `headers` are lower-cased; `body` is the
+    /// exact received bytes.
+    /// Gated by `webhook-ingress`; stub: return `err("unsupported")`.
+    parse-webhook: func(
+        headers: list<tuple<string, string>>,
+        body: list<u8>,
+    ) -> result<list<inbound-message>, string>;
 }
 
 /// A component that exports `channel` is a messaging-platform channel plugin.
 ///
-/// Required (no Rust default): `name`, `send`, `poll-message`,
+/// Required (no Rust default): `name`, `configure`, `send`, `poll-message`,
 /// `get-channel-capabilities`.
 ///
 /// All other methods are capability-gated; see `channel-capabilities` for the
@@ -305,6 +337,15 @@ interface channel {
 @unstable(feature = plugins-wit-v0)
 world channel-plugin {
     import logging;
+    import inbound;
+    // Outbound host-mediated WebSocket, for platforms that need a persistent
+    // duplex socket (Discord Gateway, Slack Socket Mode). Gated by a distinct
+    // unstable feature so the host links it only for plugins granted the
+    // `websocket-client` permission; a plugin that does not enable the feature
+    // never imports it and is unaffected (adding a world import is
+    // backward-compatible — existing components need no rebuild).
+    @unstable(feature = plugins-wit-v0-websocket)
+    import ws-client;
     export plugin-info;
     export channel;
 }

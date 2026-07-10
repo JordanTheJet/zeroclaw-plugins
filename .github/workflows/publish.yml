@@ -17,7 +17,9 @@ permissions:
 
 env:
   RELEASE_TAG: plugins
-  RELEASE_BASE: https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins
+  # Release-asset base is derived from the repo at run time (see the packaging
+  # step), so this workflow publishes to whichever repo it runs in — the fork
+  # (staging) or upstream (the canonical registry) — without a hardcoded owner.
 
 jobs:
   publish:
@@ -51,9 +53,12 @@ jobs:
 
       - name: Package + generate registry.json
         run: |
+          # Repo-relative so the registry points at THIS repo's release assets
+          # ($GITHUB_REPOSITORY is always set by the runner: "owner/repo").
+          release_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
           python3 tools/build-registry.py \
             --staged staged \
-            --release-base "$RELEASE_BASE" \
+            --release-base "$release_base" \
             --out dist
 
       - name: Publish zips to the release

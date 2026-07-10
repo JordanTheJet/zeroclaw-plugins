@@ -1,6 +1,50 @@
 {
   "plugins": [
     {
+      "name": "bluesky",
+      "version": "0.1.0",
+      "description": "Bluesky (AT Protocol) channel plugin for ZeroClaw: notification poll + threaded post replies over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/bluesky-0.1.0.zip",
+      "sha256": "eba0b5425b6da5d37dfc4f73f9f7f1618d2220cb0c141a9026a656b3e2814778"
+    },
+    {
+      "name": "mattermost",
+      "version": "0.1.0",
+      "description": "Mattermost channel plugin for ZeroClaw: v4 REST channel-post polling + createPost over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mattermost-0.1.0.zip",
+      "sha256": "1bc45352482f4c3f64c2dae7cf7eda23f3c6ac16b82560317a85b9fc2554c1be"
+    },
+    {
+      "name": "mochat",
+      "version": "0.1.0",
+      "description": "Mochat customer-service channel plugin for ZeroClaw: message-receive polling + message-send over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mochat-0.1.0.zip",
+      "sha256": "3a192f7b98e5851238ed861940727f1250d351c9a2193e8ea2c4c1e744dcf649"
+    },
+    {
+      "name": "notion",
+      "version": "0.1.0",
+      "description": "Notion task-queue channel plugin for ZeroClaw: poll a database for pending tasks and write results back over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/notion-0.1.0.zip",
+      "sha256": "e261bb0d11e3091743ffa62677dc41a8b967ea3cb098ce3ada5486b938b8e8fa"
+    },
+    {
       "name": "redact-text",
       "version": "0.1.0",
       "description": "Redact secrets and PII from text: emails, bearer/API tokens, and configured patterns",
@@ -10,6 +54,50 @@
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
       "sha256": "e722235dbab09bd47c4d28af7012ca92a80f958bb24bd52f552304ebeb5c5c52"
+    },
+    {
+      "name": "reddit",
+      "version": "0.1.0",
+      "description": "Reddit channel plugin for ZeroClaw: message/unread long-poll + comment/compose over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/reddit-0.1.0.zip",
+      "sha256": "c58158ee28dc8bcebe6fd729ea9b11ced2500150db5cd803ed9968ff885a2145"
+    },
+    {
+      "name": "telegram",
+      "version": "0.1.0",
+      "description": "Telegram channel plugin for ZeroClaw: getUpdates long-poll + sendMessage over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/telegram-0.1.0.zip",
+      "sha256": "f63176a7794a745a16962d0bc106eff0b05c53d00825cb12a29111c107f2efc9"
+    },
+    {
+      "name": "twitter",
+      "version": "0.1.0",
+      "description": "X/Twitter channel plugin for ZeroClaw: mentions polling + reply tweets over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/twitter-0.1.0.zip",
+      "sha256": "332b09947bebab140a01c6e2ec8afe495b44e5bc12beae8a7b21a16a061bcf43"
+    },
+    {
+      "name": "wechat",
+      "version": "0.1.0",
+      "description": "WeChat (iLink Bot) channel plugin for ZeroClaw: getUpdates long-poll + sendMessage over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wechat-0.1.0.zip",
+      "sha256": "251f02c6526c26aae1055b82cfa1a7915e2c0769bc23cc578552a9d2b7889072"
     }
   ]
 }
