@@ -1,0 +1,40 @@
+# Standalone crate (own [workspace]): built for wasm32-wasip2 as a channel
+# plugin component; the pure `slack` core (rlib) is host-tested with plain
+# `cargo test`. `waki` (the blocking wasi:http client) is a wasm-only dep so the
+# host test build never tries to compile it. The crypto crates
+# (`hmac`/`sha2`/`hex`) are pure Rust and compile on both host and wasm, so the
+# Slack request-signature verification is exercised by the host `cargo test`.
+[package]
+name = "slack"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Slack channel plugin for ZeroClaw: Events API webhook ingest (HMAC-verified) + chat.postMessage over wasi:http."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wit-bindgen = "0.46"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Pure-Rust HMAC-SHA256 for the Slack request-signature check (host + wasm).
+# Slack encodes the signature as lowercase hex (`v0=<hex>`), so `hex` is used
+# rather than base64.
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+
+# wasi:http client — only compiled for the wasm component, never on the host.
+[target.'cfg(target_family = "wasm")'.dependencies]
+waki = { version = "0.5.1", features = ["json"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1
+
+# Standalone crate: built for wasm32-wasip2, not part of the host workspace.
+[workspace]

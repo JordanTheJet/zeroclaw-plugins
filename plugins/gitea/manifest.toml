@@ -1,0 +1,17 @@
+name = "gitea"
+version = "0.1.0"
+description = "Gitea/Forgejo channel plugin for ZeroClaw: notifications long-poll + issue/PR comment replies over wasi:http."
+author = "JordanTheJet"
+wasm_path = "gitea.wasm"
+capabilities = ["channel"]
+# http_client: outbound REST calls to the configured Gitea/Forgejo instance
+# (TLS is performed host-side).
+# config_read: read the api_base_url + access_token from this channel's config.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `git` channel — read [channels.git.*] and honor
+# native-wins. The native `git` channel type serves GitHub, Gitea, and Forgejo;
+# this plugin implements only the Gitea/Forgejo REST provider and stays inert
+# unless `provider` is `gitea`/`forgejo`. Inert on hosts without the `provides`
+# feature (they load this as a novel channel named `gitea`, configured from
+# [[plugins.entries.gitea]]).
+provides = "git"

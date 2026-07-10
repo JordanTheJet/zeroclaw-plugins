@@ -17,9 +17,8 @@ permissions:
 
 env:
   RELEASE_TAG: plugins
-  # Release-asset base is derived from the repo at run time (see the packaging
-  # step), so this workflow publishes to whichever repo it runs in — the fork
-  # (staging) or upstream (the canonical registry) — without a hardcoded owner.
+  # Derived from $GITHUB_REPOSITORY in the packaging step so fork runs publish
+  # fork-owned assets, while upstream runs publish canonical upstream assets.
 
 jobs:
   publish:
@@ -39,6 +38,10 @@ jobs:
           for dir in plugins/*/; do
             [ -f "${dir}manifest.toml" ] || continue
             name=$(basename "$dir")
+            if grep -qE '^[[:space:]]*registry[[:space:]]*=[[:space:]]*false' "${dir}manifest.toml"; then
+              echo "skip $name (registry = false: host-gated source)"
+              continue
+            fi
             echo "::group::build $name"
             ( cd "$dir" && cargo build --target wasm32-wasip2 --release )
             wasm=$(grep -E '^wasm_path' "${dir}manifest.toml" | sed -E 's/.*"(.*)".*/\1/')
@@ -53,8 +56,6 @@ jobs:
 
       - name: Package + generate registry.json
         run: |
-          # Repo-relative so the registry points at THIS repo's release assets
-          # ($GITHUB_REPOSITORY is always set by the runner: "owner/repo").
           release_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
           python3 tools/build-registry.py \
             --staged staged \

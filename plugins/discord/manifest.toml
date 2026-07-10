@@ -1,0 +1,19 @@
+name = "discord"
+version = "0.1.0"
+description = "Discord channel plugin for ZeroClaw: Gateway WebSocket (host ws-client) + REST send over wasi:http."
+author = "JordanTheJet"
+wasm_path = "discord.wasm"
+capabilities = ["channel"]
+# Host-gated source: requires the `websocket_client` host capability. Keep the
+# source in this repo, but do not publish it into registry.json yet.
+registry = false
+# websocket_client: the Discord Gateway is a persistent WebSocket the host dials
+#   and pumps (TLS host-side); the plugin drives the protocol over it.
+# http_client: REST sends (POST /channels/{id}/messages) + GET /gateway/bot.
+# config_read: read the bot token + settings from this channel's config section.
+permissions = ["websocket_client", "http_client", "config_read"]
+# provides: mirror the built-in `discord` channel — read [channels.discord.*] and
+# honor native-wins. Inert on hosts without the `provides` feature (they load
+# this as a novel channel named `discord`). Requires a host built with the
+# `plugins-wit-v0-websocket` WebSocket capability.
+provides = "discord"

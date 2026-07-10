@@ -58,6 +58,7 @@ KNOWN_PERMISSIONS = {
     "env_read",  # serde alias for config_read
     "memory_read",
     "memory_write",
+    "websocket_client",
 }
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -162,6 +163,14 @@ def main() -> None:
             meta = tomllib.loads(manifest.read_text())
         except tomllib.TOMLDecodeError as e:
             failures.append(f"{pdir.name}: invalid manifest.toml: {e}")
+            continue
+
+        # Host-gated / source-only plugins opt out of the install registry with
+        # `registry = false`. Their source can land before the required host
+        # capability is safe to publish, but stock hosts must not be offered an
+        # entry they cannot run.
+        if meta.get("registry") is False:
+            print(f"  skipping {pdir.name} (registry = false: host-gated source)")
             continue
 
         errors = validate(pdir, meta)

@@ -1,0 +1,16 @@
+name = "whatsapp"
+version = "0.1.0"
+description = "WhatsApp Cloud (Meta Graph) channel plugin for ZeroClaw: webhook verification + signed inbound events + sendMessage over wasi:http."
+author = "JordanTheJet"
+wasm_path = "whatsapp.wasm"
+capabilities = ["channel"]
+# http_client: outbound calls to the Meta Graph API (graph.facebook.com; TLS is
+# performed host-side).
+# config_read: read this channel's settings + secrets (access_token, app_secret,
+# verify_token, phone_number_id) from its config section.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `whatsapp` channel — read [channels.whatsapp.*]
+# and honor native-wins. Inert on hosts without the `provides` feature (they load
+# this as a novel channel named `whatsapp`, configured from
+# [[plugins.entries.whatsapp]]).
+provides = "whatsapp"

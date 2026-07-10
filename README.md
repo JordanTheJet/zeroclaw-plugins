@@ -95,13 +95,27 @@ and its layout is the required format:
 4. **Manifest.** `manifest.toml` with `name` (kebab-case, says what it does),
    `version`, `wasm_path`, `capabilities`, and only permissions the host
    actually supports (`http_client`, `file_read`, `file_write`, `config_read`,
-   `memory_read`, `memory_write`).
+   `memory_read`, `memory_write`, `websocket_client`).
 5. Build it:
    ```bash
    rustup target add wasm32-wasip2
    (cd plugins/<name> && cargo test && cargo build --target wasm32-wasip2 --release)
    ```
 6. Open a PR. On merge, the publish workflow packages and indexes it.
+
+### Host-gated source plugins
+
+Some channel migrations need a host capability or protocol port that is not
+ready for the install registry yet. Keep that source in `plugins/<name>/`, but
+set `registry = false` in `manifest.toml`:
+
+```toml
+registry = false
+```
+
+The publish workflow skips those plugins entirely: no build, no zip, and no
+`registry.json` entry. Remove the guard only when stock hosts can run the
+plugin and the protocol parity tests are in place.
 
 ## Run your own registry
 

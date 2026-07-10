@@ -1,0 +1,14 @@
+name = "wecom"
+version = "0.1.0"
+description = "WeCom channel plugin source for ZeroClaw: host-gated WeCom application adapter scaffold."
+author = "JordanTheJet"
+wasm_path = "wecom.wasm"
+capabilities = ["channel"]
+# Host-gated source: keep the migration source in this repo, but do not publish
+# it into registry.json until the native transport/API parity is implemented.
+registry = false
+# config_read: read [channels.wecom.*] when loaded as a mirror plugin.
+permissions = ["config_read"]
+# provides: mirror the built-in `wecom` channel — read the existing
+# channel config as the single source of truth and honor native-wins.
+provides = "wecom"
