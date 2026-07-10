@@ -1,25 +1,23 @@
-//! A ZeroClaw WIT **channel** plugin: Linq (Partner V3 API — iMessage/RCS/SMS).
+//! A ZeroClaw WIT **channel** plugin: generic inbound Webhook.
 //!
 //! A **webhook** channel: it does not poll. The host serves `POST` on
-//! `/plugin/linq` and hands each request to [`parse_webhook`]. When a
-//! `signing_secret` is configured the plugin verifies the `X-Webhook-Signature`
-//! HMAC-SHA256 over `"{X-Webhook-Timestamp}.{body}"` (a 300 s replay window)
-//! before decoding events; a bad signature returns `Err(reason)` so the host
-//! replies `401`. Linq has no GET verification handshake, so a GET is a no-op
-//! acknowledgement.
+//! `/plugin/webhook` and hands each request to [`parse_webhook`]. When a `secret`
+//! is configured the plugin verifies the `X-Webhook-Signature` HMAC-SHA256 over
+//! the raw body (hex, `sha256=` prefix tolerated) before decoding; a bad or
+//! missing signature returns `Err(reason)` so the host replies `401`. When no
+//! secret is set, all inbound is accepted. A GET is a no-op acknowledgement.
 //!
-//! Replies are sent to the originating chat (`POST <base>/chats/<id>/messages`);
-//! on a `404` (unknown chat) the plugin creates a new chat
-//! (`POST <base>/chats`) from `from_phone`. TLS is performed host-side by the
-//! `wasi:http` client (`waki`).
+//! The inbound payload is `{sender, content, thread_id?}`; replies are POSTed
+//! (or PUT) to `send_url` as `{content, thread_id?, recipient?}` over the host's
+//! `wasi:http` (`waki`), with the optional `auth_header` as `Authorization`.
 //!
-//! The pure logic (config/signature/decode/body) lives in [`linq`] and is
+//! The pure logic (config/signature/decode/body) lives in [`webhook`] and is
 //! host-`cargo test`ed; this file is the component shim.
 //!
 //! Build:  rustup target add wasm32-wasip2
 //!         cargo build --target wasm32-wasip2 --release
 
-pub mod linq;
+pub mod webhook;
 
 #[cfg(target_family = "wasm")]
 mod component {
@@ -29,12 +27,11 @@ mod component {
         features: ["plugins-wit-v0"],
     });
 
-    use std::cell::RefCell;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::cell::{Cell, RefCell};
+    use std::time::Duration;
 
-    use crate::linq::{
-        build_create_chat_body, build_send_body, create_chat_url, parse_webhook_payload,
-        send_message_url, verify_signature, Inbound, LinqConfig, WEBHOOK_PATH,
+    use crate::webhook::{
+        build_outgoing, parse_incoming, verify_signature, Inbound, WebhookConfig, WEBHOOK_PATH,
     };
 
     use exports::zeroclaw::plugin::channel::{
@@ -43,35 +40,15 @@ mod component {
     };
     use exports::zeroclaw::plugin::plugin_info::Guest as PluginInfo;
 
-    const PLUGIN_NAME: &str = "linq";
+    const PLUGIN_NAME: &str = "webhook";
     const PLUGIN_VERSION: &str = "0.1.0";
     const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
     thread_local! {
-        static CONFIG: RefCell<LinqConfig> = RefCell::new(LinqConfig::default());
-    }
-
-    fn now_secs() -> i64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
-            .unwrap_or(0)
-    }
-
-    fn to_wit(inb: Inbound) -> InboundMessage {
-        InboundMessage {
-            id: inb.id,
-            sender: inb.sender,
-            reply_target: inb.reply_target,
-            content: inb.content,
-            channel: PLUGIN_NAME.to_string(),
-            channel_alias: None,
-            timestamp: inb.timestamp,
-            thread_ts: None,
-            interruption_scope_id: None,
-            attachments: Vec::new(),
-            subject: None,
-        }
+        static CONFIG: RefCell<WebhookConfig> = RefCell::new(WebhookConfig::default());
+        /// Monotonic inbound counter for the message id (`webhook_<seq>`),
+        /// mirroring the native channel's sequence.
+        static SEQ: Cell<u64> = const { Cell::new(0) };
     }
 
     fn header_get(headers: &[(String, String)], name: &str) -> Option<String> {
@@ -81,21 +58,30 @@ mod component {
             .map(|(_, v)| v.clone())
     }
 
-    fn post_json_bearer(url: &str, token: &str, body: &serde_json::Value) -> Result<u16, String> {
-        let resp = waki::Client::new()
-            .post(url)
-            .header("Authorization", format!("Bearer {token}"))
-            .header("Content-Type", "application/json")
-            .connect_timeout(CONNECT_TIMEOUT)
-            .json(body)
-            .send()
-            .map_err(|e| format!("linq send failed: {e}"))?;
-        Ok(resp.status_code())
+    fn to_wit(inb: Inbound) -> InboundMessage {
+        let seq = SEQ.with(|c| {
+            let v = c.get();
+            c.set(v.wrapping_add(1));
+            v
+        });
+        InboundMessage {
+            id: format!("webhook_{seq}"),
+            sender: inb.sender,
+            reply_target: inb.reply_target,
+            content: inb.content,
+            channel: PLUGIN_NAME.to_string(),
+            channel_alias: None,
+            timestamp: 0,
+            thread_ts: inb.thread_ts,
+            interruption_scope_id: None,
+            attachments: Vec::new(),
+            subject: None,
+        }
     }
 
-    struct LinqChannel;
+    struct WebhookChannel;
 
-    impl PluginInfo for LinqChannel {
+    impl PluginInfo for WebhookChannel {
         fn plugin_name() -> String {
             PLUGIN_NAME.to_string()
         }
@@ -104,42 +90,49 @@ mod component {
         }
     }
 
-    impl Channel for LinqChannel {
+    impl Channel for WebhookChannel {
         fn name() -> String {
             PLUGIN_NAME.to_string()
         }
 
         fn configure(config: String) -> Result<(), String> {
-            CONFIG.with(|c| *c.borrow_mut() = LinqConfig::from_json(&config));
+            CONFIG.with(|c| *c.borrow_mut() = WebhookConfig::from_json(&config));
             Ok(())
         }
 
         fn send(message: SendMessage) -> Result<(), String> {
             let cfg = CONFIG.with(|c| c.borrow().clone());
-            let token = cfg.api_token();
-            if token.is_empty() {
-                return Err("linq: missing api_token in config".to_string());
-            }
-
-            // Try sending to the chat named by `recipient`.
-            let body = build_send_body(&message.content);
-            let status = post_json_bearer(&send_message_url(&message.recipient), token, &body)?;
-            if (200..300).contains(&status) {
+            // No outbound URL configured → drop silently (matches the native
+            // channel, which logs and returns Ok).
+            let Some(url) = cfg.send_url().map(str::to_string) else {
                 return Ok(());
+            };
+            let body = build_outgoing(
+                &message.content,
+                message.thread_ts.as_deref(),
+                &message.recipient,
+            );
+
+            let client = waki::Client::new();
+            let mut req = match cfg.send_method().as_str() {
+                "PUT" => client.put(&url),
+                _ => client.post(&url),
+            }
+            .header("Content-Type", "application/json")
+            .connect_timeout(CONNECT_TIMEOUT);
+            if let Some(auth) = cfg.auth_header() {
+                req = req.header("Authorization", auth);
             }
 
-            // 404 → create a new chat with `recipient` as the destination.
-            if status == 404 {
-                let from = cfg.from_phone();
-                let create = build_create_chat_body(from, &message.recipient, &message.content);
-                let cstatus = post_json_bearer(&create_chat_url(), token, &create)?;
-                if (200..300).contains(&cstatus) {
-                    return Ok(());
-                }
-                return Err(format!("linq create-chat failed (HTTP {cstatus})"));
+            let resp = req
+                .json(&body)
+                .send()
+                .map_err(|e| format!("webhook send failed: {e}"))?;
+            let status = resp.status_code();
+            if !(200..300).contains(&status) {
+                return Err(format!("webhook send failed (HTTP {status})"));
             }
-
-            Err(format!("linq send failed (HTTP {status})"))
+            Ok(())
         }
 
         /// A webhook channel never polls — inbound arrives via `parse_webhook`.
@@ -152,7 +145,7 @@ mod component {
         }
 
         fn health_check() -> bool {
-            CONFIG.with(|c| !c.borrow().api_token().is_empty())
+            true
         }
 
         fn webhook_path() -> Option<String> {
@@ -164,28 +157,19 @@ mod component {
             body: Vec<u8>,
         ) -> Result<Vec<InboundMessage>, String> {
             let method = header_get(&headers, "x-webhook-method").unwrap_or_default();
-            // Linq has no GET verification handshake; ack a GET with nothing.
+            // Generic webhook has no GET verification; ack a GET with nothing.
             if method.eq_ignore_ascii_case("GET") {
                 return Ok(Vec::new());
             }
 
             let cfg = CONFIG.with(|c| c.borrow().clone());
-            // Verify the signature only when a signing secret is configured
-            // (mirrors the native gateway).
-            if let Some(secret) = cfg.signing_secret() {
-                let timestamp = header_get(&headers, "x-webhook-timestamp").unwrap_or_default();
-                let signature = header_get(&headers, "x-webhook-signature").unwrap_or_default();
-                if !verify_signature(secret, &body, &timestamp, &signature, now_secs()) {
-                    return Err("linq: X-Webhook-Signature verification failed".to_string());
-                }
+            let signature = header_get(&headers, "x-webhook-signature");
+            if !verify_signature(cfg.secret(), &body, signature.as_deref()) {
+                return Err("webhook: X-Webhook-Signature verification failed".to_string());
             }
 
-            let payload: serde_json::Value = serde_json::from_slice(&body)
-                .map_err(|e| format!("linq: invalid JSON payload: {e}"))?;
-            Ok(parse_webhook_payload(&payload)
-                .into_iter()
-                .map(to_wit)
-                .collect())
+            let inbound = parse_incoming(&body)?;
+            Ok(vec![to_wit(inbound)])
         }
 
         // ── capability-gated stubs (documented WIT defaults) ──
@@ -261,5 +245,5 @@ mod component {
         }
     }
 
-    export!(LinqChannel);
+    export!(WebhookChannel);
 }

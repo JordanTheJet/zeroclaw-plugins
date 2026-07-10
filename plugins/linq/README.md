@@ -1,25 +1,49 @@
-# linq - ZeroClaw channel plugin source
+# linq — ZeroClaw channel plugin
 
-This directory is the Phase 4 migration landing point for the built-in
-`linq` channel. The manifest declares `provides = "linq"`, so
-when it becomes publishable it will read the existing `[channels.linq.*]`
-configuration as the single source of truth and honor the native-wins policy.
+A WASM (`wasm32-wasip2`) channel plugin mirroring the built-in **Linq** channel
+(iMessage / RCS / SMS via the Linq Partner V3 API). `provides = "linq"`, so it
+reads the existing `[channels.linq.<alias>]` config as the single source of truth
+and honors native-wins.
 
-Current status: **source-only / host-gated**. The plugin exports the channel WIT
-surface, parses configuration, reports identity metadata, and can drain messages
-that a future host-managed listener queues for it. Direct send/poll transport is
-not published yet:
+## How it works
 
-Linq requires a host-managed Linq client or a future WASI TCP/TLS capability before this source-only plugin can publish.
+Linq delivers messages by POSTing webhooks, so this is a **webhook** channel, not
+a poller. The host serves `POST /plugin/linq`. On each request the plugin:
 
-Because `registry = false`, CI keeps this source in the repo but does not build,
-package, or advertise it in `registry.json`. Remove that guard only when protocol
-parity has tests and the required host capability is available to stock hosts.
+1. **Verifies** the signature when `signing_secret` is configured: the request
+   must carry `X-Webhook-Signature: [sha256=]<hex(HMAC-SHA256(secret,
+   "{X-Webhook-Timestamp}.{body}"))>` and a fresh `X-Webhook-Timestamp` (within a
+   300 s replay window). A bad signature is rejected with `401`. When no secret is
+   set, inbound is accepted without verification (matching the native gateway).
+2. **Decodes** the payload. Both webhook shapes are supported — the legacy
+   (`chat_id` / `from` / `is_from_me` / `message.parts`) and the current
+   `2026-02-03` shape (`chat.id` / `sender_handle` / `direction` / `parts`). Only
+   `message.received` events yield messages; outgoing ones are skipped.
+
+`reply_target` is the `chat_id` when present (so replies land in the same
+conversation), else the sender's number. Replies are sent to the chat
+(`POST /chats/<id>/messages`); on a `404` the plugin creates a new chat
+(`POST /chats`) from `from_phone`.
+
+## Config (`[channels.linq.<alias>]`)
+
+- `api_token` — Linq Partner API token (Bearer auth), required to send.
+- `from_phone` — E.164 number to send from (used when creating a new chat).
+- `signing_secret` — optional; enables `X-Webhook-Signature` verification.
+
+## Scope / deferrals
+
+- **Text only.** Inbound **images** are surfaced as an `[IMAGE:<url>]` marker
+  (matching the native channel); no media is downloaded. Other non-text parts are
+  skipped.
+- No sender allowlist in the plugin; the host gates senders via `peer_groups`.
+- Inbound `timestamp` is left `0` (the native `created_at` is RFC 3339 and this
+  I/O-free core carries no date parser). Typing indicators are no-ops.
 
 ## Build
 
 ```bash
-cargo test
+cargo test --lib
 rustup target add wasm32-wasip2
 cargo build --target wasm32-wasip2 --release
 ```
