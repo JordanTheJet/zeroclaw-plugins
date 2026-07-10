@@ -8,7 +8,7 @@ sandboxed `wasm32-wasip2` WIT component with no native build.
 
 ```bash
 zeroclaw plugin install discord \
-  --registry https://raw.githubusercontent.com/JordanTheJet/zeroclaw-plugins/main/registry.json
+  --registry https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw-plugins/main/registry.json
 ```
 
 > **Host requirement.** Discord needs a persistent duplex socket, which a

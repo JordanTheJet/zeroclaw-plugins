@@ -4,6 +4,13 @@ description = "Discord channel plugin for ZeroClaw: Gateway WebSocket (host ws-c
 author = "JordanTheJet"
 wasm_path = "discord.wasm"
 capabilities = ["channel"]
+# registry: host-gated plugin — keep the source in the repo but OUT of the
+# published registry.json. Discord needs the host `websocket_client` capability
+# (zeroclaw#8863), which no released host has yet, so a stock host must never be
+# offered it for install. The publish pipeline skips `registry = false` plugins.
+# Flip to `true` (or drop this line) once the capability ships and discord is
+# ready to publish.
+registry = false
 # websocket_client: the Discord Gateway is a persistent WebSocket the host dials
 #   and pumps (TLS host-side); the plugin drives the protocol over it.
 # http_client: REST sends (POST /channels/{id}/messages) + GET /gateway/bot.
