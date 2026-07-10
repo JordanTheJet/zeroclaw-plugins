@@ -9,7 +9,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/bluesky-0.1.0.zip",
-      "sha256": "eba0b5425b6da5d37dfc4f73f9f7f1618d2220cb0c141a9026a656b3e2814778"
+      "sha256": "695af4954c2577391af02f822569744fb1906bd3a8db05125684763c5e2a9e52"
     },
     {
       "name": "mattermost",
@@ -20,7 +20,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mattermost-0.1.0.zip",
-      "sha256": "1bc45352482f4c3f64c2dae7cf7eda23f3c6ac16b82560317a85b9fc2554c1be"
+      "sha256": "df6d8ca21f8a4a93bc8e18fef441b5886beb39e2688f850e1ccfaf431ac7b85c"
     },
     {
       "name": "mochat",
@@ -31,7 +31,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mochat-0.1.0.zip",
-      "sha256": "3a192f7b98e5851238ed861940727f1250d351c9a2193e8ea2c4c1e744dcf649"
+      "sha256": "d7ba5f552a304a88a8a27887b6f306171192c516fc53e2b37a8d422d25ff950d"
     },
     {
       "name": "notion",
@@ -42,7 +42,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/notion-0.1.0.zip",
-      "sha256": "e261bb0d11e3091743ffa62677dc41a8b967ea3cb098ce3ada5486b938b8e8fa"
+      "sha256": "14241ec074af63c093d9216657940b954eb99d105efbda68ec9078b7f8b7ee8d"
     },
     {
       "name": "redact-text",
@@ -53,7 +53,7 @@
         "tool"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
-      "sha256": "e722235dbab09bd47c4d28af7012ca92a80f958bb24bd52f552304ebeb5c5c52"
+      "sha256": "d315647652eb7c18bf00034822c271e0612c8edebb056eb58d1b7327f360aa68"
     },
     {
       "name": "reddit",
@@ -64,7 +64,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/reddit-0.1.0.zip",
-      "sha256": "c58158ee28dc8bcebe6fd729ea9b11ced2500150db5cd803ed9968ff885a2145"
+      "sha256": "a6964c868299a20e0337aac597ddf502a93ed53cb83aee6a3aaca4ef9edc06a1"
     },
     {
       "name": "telegram",
@@ -75,7 +75,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/telegram-0.1.0.zip",
-      "sha256": "f63176a7794a745a16962d0bc106eff0b05c53d00825cb12a29111c107f2efc9"
+      "sha256": "67e3e13ce7f21950da87d1432cb69cfa0867d65fa0c917e336243a968db9dbf0"
     },
     {
       "name": "twitter",
@@ -86,7 +86,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/twitter-0.1.0.zip",
-      "sha256": "332b09947bebab140a01c6e2ec8afe495b44e5bc12beae8a7b21a16a061bcf43"
+      "sha256": "d8a4a795da05f557e17eeb378b98906b0112d5fc59f8a078c4290f42c95b8e1c"
     },
     {
       "name": "wechat",
@@ -97,7 +97,7 @@
         "channel"
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wechat-0.1.0.zip",
-      "sha256": "251f02c6526c26aae1055b82cfa1a7915e2c0769bc23cc578552a9d2b7889072"
+      "sha256": "a85ae6f57d50f67fb668671a1fdc7580334c66f6204d874a854a5c1133a15fdc"
     }
   ]
 }
