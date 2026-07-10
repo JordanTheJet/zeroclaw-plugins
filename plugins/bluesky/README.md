@@ -8,7 +8,7 @@ sends the agent's responses back as **threaded posts** — all from a sandboxed
 
 ```bash
 zeroclaw plugin install bluesky \
-  --registry https://raw.githubusercontent.com/JordanTheJet/zeroclaw-plugins/main/registry.json
+  --registry https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw-plugins/main/registry.json
 ```
 
 ## Configuration

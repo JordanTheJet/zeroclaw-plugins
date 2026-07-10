@@ -11,7 +11,7 @@ pending rows and an outbound reply is a page update, not a chat post.
 
 ```bash
 zeroclaw plugin install notion \
-  --registry https://raw.githubusercontent.com/JordanTheJet/zeroclaw-plugins/main/registry.json
+  --registry https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw-plugins/main/registry.json
 ```
 
 ## Configuration

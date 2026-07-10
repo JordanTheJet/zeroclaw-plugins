@@ -8,8 +8,30 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/bluesky-0.1.0.zip",
-      "sha256": "eba0b5425b6da5d37dfc4f73f9f7f1618d2220cb0c141a9026a656b3e2814778"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/bluesky-0.1.0.zip",
+      "sha256": "2cd3d81c975ac56e504de6846caee8673faacfa9cb992a068a9c281f373ff2d5"
+    },
+    {
+      "name": "discord",
+      "version": "0.1.0",
+      "description": "Discord channel plugin for ZeroClaw: Gateway WebSocket (host ws-client) + REST send over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/discord-0.1.0.zip",
+      "sha256": "4ec8c3c73b8f2f659a6c09874dbb017a72c491d9d0c1220889d5e6a567668e5e"
+    },
+    {
+      "name": "line",
+      "version": "0.1.0",
+      "description": "LINE channel plugin for ZeroClaw: webhook ingress (host-verified) + Messaging API push over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/line-0.1.0.zip",
+      "sha256": "71643edd75e7e9780bd8b5bcdcaaf83e8c471ad98916147dce3670e9aa98721c"
     },
     {
       "name": "mattermost",
@@ -19,8 +41,8 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/mattermost-0.1.0.zip",
-      "sha256": "1bc45352482f4c3f64c2dae7cf7eda23f3c6ac16b82560317a85b9fc2554c1be"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mattermost-0.1.0.zip",
+      "sha256": "01106431f4539d38cf4d0ae77b0d7c25f8214a272774b6471248e6b9a34f06ff"
     },
     {
       "name": "mochat",
@@ -30,8 +52,8 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/mochat-0.1.0.zip",
-      "sha256": "3a192f7b98e5851238ed861940727f1250d351c9a2193e8ea2c4c1e744dcf649"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mochat-0.1.0.zip",
+      "sha256": "82f4ef44d436e6f699915f8e2cb08c1f53adbb58da4013d50183b8e4dcc2a207"
     },
     {
       "name": "notion",
@@ -41,8 +63,8 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/notion-0.1.0.zip",
-      "sha256": "e261bb0d11e3091743ffa62677dc41a8b967ea3cb098ce3ada5486b938b8e8fa"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/notion-0.1.0.zip",
+      "sha256": "71e10b0a0378f78d507f8b645f5b9f2bfa4b56ef2779a3dbed77d8aab31f8a6c"
     },
     {
       "name": "redact-text",
@@ -52,8 +74,8 @@
       "capabilities": [
         "tool"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
-      "sha256": "e722235dbab09bd47c4d28af7012ca92a80f958bb24bd52f552304ebeb5c5c52"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/redact-text-0.1.0.zip",
+      "sha256": "6cee020f2c537c26f092fceff895633969f2d98d63f666d272c6da42a449f2ae"
     },
     {
       "name": "reddit",
@@ -63,8 +85,8 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/reddit-0.1.0.zip",
-      "sha256": "c58158ee28dc8bcebe6fd729ea9b11ced2500150db5cd803ed9968ff885a2145"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/reddit-0.1.0.zip",
+      "sha256": "b15174f34ffd8f13c80e04139795336fb583fe473f987ae07d4a4bb7aad92485"
     },
     {
       "name": "telegram",
@@ -74,8 +96,8 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/telegram-0.1.0.zip",
-      "sha256": "f63176a7794a745a16962d0bc106eff0b05c53d00825cb12a29111c107f2efc9"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/telegram-0.1.0.zip",
+      "sha256": "0c1c5fceddefcbd2fe724e079b9659356bdb5111b2d8ba2dccace81f3e86f676"
     },
     {
       "name": "twitter",
@@ -85,8 +107,8 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/twitter-0.1.0.zip",
-      "sha256": "332b09947bebab140a01c6e2ec8afe495b44e5bc12beae8a7b21a16a061bcf43"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/twitter-0.1.0.zip",
+      "sha256": "01c092f9e00e8cfac3ec0847997d0a62273e6a5eefd506d612ffcac43c6a6a1a"
     },
     {
       "name": "wechat",
@@ -96,8 +118,8 @@
       "capabilities": [
         "channel"
       ],
-      "url": "https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins/wechat-0.1.0.zip",
-      "sha256": "251f02c6526c26aae1055b82cfa1a7915e2c0769bc23cc578552a9d2b7889072"
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wechat-0.1.0.zip",
+      "sha256": "a34867ec61997f231e514460c1d312ae955db17248740c66c07c309d165467aa"
     }
   ]
 }

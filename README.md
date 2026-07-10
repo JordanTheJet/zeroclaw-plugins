@@ -95,7 +95,7 @@ and its layout is the required format:
 4. **Manifest.** `manifest.toml` with `name` (kebab-case, says what it does),
    `version`, `wasm_path`, `capabilities`, and only permissions the host
    actually supports (`http_client`, `file_read`, `file_write`, `config_read`,
-   `memory_read`, `memory_write`).
+   `memory_read`, `memory_write`, `websocket_client`).
 5. Build it:
    ```bash
    rustup target add wasm32-wasip2

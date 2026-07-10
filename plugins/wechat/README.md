@@ -8,7 +8,7 @@ sends the agent's replies with `sendmessage` — all from a sandboxed
 
 ```bash
 zeroclaw plugin install wechat \
-  --registry https://raw.githubusercontent.com/JordanTheJet/zeroclaw-plugins/main/registry.json
+  --registry https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw-plugins/main/registry.json
 ```
 
 ## Session / login

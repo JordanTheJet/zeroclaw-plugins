@@ -58,6 +58,7 @@ KNOWN_PERMISSIONS = {
     "env_read",  # serde alias for config_read
     "memory_read",
     "memory_write",
+    "websocket_client",
 }
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")

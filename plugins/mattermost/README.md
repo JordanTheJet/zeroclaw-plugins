@@ -7,7 +7,7 @@ WIT component, with no native build.
 
 ```bash
 zeroclaw plugin install mattermost \
-  --registry https://raw.githubusercontent.com/JordanTheJet/zeroclaw-plugins/main/registry.json
+  --registry https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw-plugins/main/registry.json
 ```
 
 ## Configuration

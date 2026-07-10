@@ -17,7 +17,7 @@ permissions:
 
 env:
   RELEASE_TAG: plugins
-  RELEASE_BASE: https://github.com/JordanTheJet/zeroclaw-plugins/releases/download/plugins
+  RELEASE_BASE: https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins
 
 jobs:
   publish:

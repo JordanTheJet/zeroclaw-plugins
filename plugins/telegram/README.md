@@ -7,7 +7,7 @@ messages and sends the agent's replies back — all from a sandboxed
 
 ```bash
 zeroclaw plugin install telegram \
-  --registry https://raw.githubusercontent.com/JordanTheJet/zeroclaw-plugins/main/registry.json
+  --registry https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw-plugins/main/registry.json
 ```
 
 ## Configuration
