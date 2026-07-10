@@ -4,6 +4,13 @@ description = "LINE channel plugin for ZeroClaw: webhook ingress (host-verified)
 author = "JordanTheJet"
 wasm_path = "line.wasm"
 capabilities = ["channel"]
+# registry: host-gated plugin — keep the source in the repo but OUT of the
+# published registry.json. LINE serves inbound over the host webhook route and
+# needs the host webhook-ingress capability (zeroclaw#8862), which no released
+# host has yet, so a stock host must never be offered it for install. The
+# publish pipeline skips `registry = false` plugins. Flip to `true` (or drop
+# this line) once the capability ships and line is ready to publish.
+registry = false
 # http_client: Messaging API push (POST /v2/bot/message/push, TLS host-side).
 # config_read: read the channel access token + secret from this channel's config.
 permissions = ["http_client", "config_read"]
