@@ -164,6 +164,16 @@ def main() -> None:
             failures.append(f"{pdir.name}: invalid manifest.toml: {e}")
             continue
 
+        # Host-gated / source-only plugins opt out of the registry with
+        # `registry = false`: their source lives in the repo, ready to publish
+        # the moment their host capability ships, but a stock host must never be
+        # offered them for install. Skip before validation — a plugin may
+        # legitimately declare a permission the current host does not yet know
+        # (e.g. `websocket_client`), which `validate()` would otherwise reject.
+        if meta.get("registry") is False:
+            print(f"  skipping {pdir.name} (registry = false: host-gated source)")
+            continue
+
         errors = validate(pdir, meta)
         if errors:
             failures.extend(f"{pdir.name}: {e}" for e in errors)

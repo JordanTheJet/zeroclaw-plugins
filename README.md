@@ -103,6 +103,22 @@ and its layout is the required format:
    ```
 6. Open a PR. On merge, the publish workflow packages and indexes it.
 
+### Host-gated (source-only) plugins
+
+A plugin may need a host capability that no released ZeroClaw has yet (e.g. a
+persistent WebSocket, or webhook ingress). Its source can still live here —
+ready to publish the moment that capability ships — without being offered to a
+stock host that cannot run it. Set **`registry = false`** in its `manifest.toml`:
+
+```toml
+registry = false   # host-gated: keep the source, but keep it out of registry.json
+```
+
+The publish pipeline skips such plugins entirely — they are never built,
+packaged, or added to `registry.json`, and they never fail the publish run even
+if they declare a permission the current host does not yet know. When the host
+capability lands, drop the line (or set `true`) and the next publish indexes it.
+
 ## Run your own registry
 
 ```bash
