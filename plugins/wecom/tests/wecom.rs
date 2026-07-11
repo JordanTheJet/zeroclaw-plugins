@@ -1,26 +1,23 @@
-use wecom::wecom::{has_config, send_unavailable, SourceOnlyConfig, CHANNEL, PLUGIN_NAME};
+use serde_json::json;
+use wecom::wecom::{build_text_body, check_api_response, webhook_url, WeComConfig};
 
 #[test]
-fn parses_common_self_handle_fields() {
-    let cfg = SourceOnlyConfig::from_json(r#"{"bot_username":"botty"}"#);
-    assert_eq!(cfg.self_handle.as_deref(), Some("botty"));
+fn config_to_webhook_request() {
+    let cfg = WeComConfig::from_json(
+        r#"{"enabled":true,"webhook_key":"bot-key","excluded_tools":["shell"]}"#,
+    );
+    assert!(cfg.is_configured());
+    assert_eq!(
+        webhook_url(cfg.webhook_key()),
+        "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=bot%2Dkey"
+    );
+    let body = build_text_body("hello");
+    assert_eq!(body["msgtype"], "text");
+    assert_eq!(body["text"]["content"], "hello");
 }
 
 #[test]
-fn empty_or_invalid_config_is_not_considered_configured() {
-    assert!(!has_config("{}"));
-    assert!(!has_config("not json"));
-    assert!(!has_config(r#"{"enabled":true}"#));
-}
-
-#[test]
-fn non_empty_config_is_detected() {
-    assert!(has_config(r#"{"token":"secret"}"#));
-}
-
-#[test]
-fn send_error_names_the_plugin_and_channel() {
-    let err = send_unavailable();
-    assert!(err.contains(PLUGIN_NAME));
-    assert!(err.contains(CHANNEL));
+fn api_result_controls_send_success() {
+    assert!(check_api_response(&json!({"errcode": 0, "errmsg": "ok"})).is_ok());
+    assert!(check_api_response(&json!({"errcode": 40014, "errmsg": "invalid key"})).is_err());
 }

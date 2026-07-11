@@ -1,9 +1,4 @@
-//! A ZeroClaw WIT **channel** plugin source scaffold: WeCom.
-//!
-//! This is the Phase 4 migration landing point for the built-in `wecom`
-//! channel. It compiles as a channel plugin and mirrors the existing channel
-//! config via `provides = "wecom"`, but remains `registry = false` until
-//! the native transport/API behavior is fully ported and validated.
+//! A ZeroClaw WIT channel plugin for the send-only WeCom Bot Webhook API.
 
 pub mod wecom;
 
@@ -17,46 +12,55 @@ mod component {
 
     use std::cell::RefCell;
 
-    use crate::wecom::{send_unavailable, SourceOnlyConfig, CHANNEL, PLUGIN_NAME};
-
+    use crate::wecom::{build_text_body, check_api_response, webhook_url, WeComConfig, CHANNEL};
     use exports::zeroclaw::plugin::channel::{
         ApprovalRequest, ApprovalResponse, ChannelCapabilities, Guest as Channel, InboundMessage,
         SendMessage,
     };
     use exports::zeroclaw::plugin::plugin_info::Guest as PluginInfo;
-    use zeroclaw::plugin::inbound::{self, HostInboundMessage};
 
     const PLUGIN_VERSION: &str = "0.1.0";
 
     thread_local! {
-        static CONFIG: RefCell<SourceOnlyConfig> = RefCell::new(SourceOnlyConfig::default());
+        static CONFIG: RefCell<WeComConfig> = RefCell::new(WeComConfig::default());
     }
 
-    fn from_host(msg: HostInboundMessage) -> InboundMessage {
-        InboundMessage {
-            id: msg.id,
-            sender: msg.sender,
-            reply_target: msg.reply_target,
-            content: msg.content,
-            channel: if msg.channel.is_empty() {
-                CHANNEL.to_string()
-            } else {
-                msg.channel
-            },
-            channel_alias: msg.channel_alias,
-            timestamp: msg.timestamp,
-            thread_ts: msg.thread_ts,
-            interruption_scope_id: msg.interruption_scope_id,
-            attachments: Vec::new(),
-            subject: msg.subject,
+    fn response_detail(resp: waki::Response) -> String {
+        resp.body()
+            .ok()
+            .and_then(|body| String::from_utf8(body).ok())
+            .unwrap_or_default()
+    }
+
+    fn send_text(cfg: &WeComConfig, content: &str) -> Result<(), String> {
+        if !cfg.is_configured() {
+            return Err("wecom: webhook_key is required".to_string());
         }
+        let url = webhook_url(cfg.webhook_key());
+        let resp = waki::Client::new()
+            .post(&url)
+            .header("Accept", "application/json")
+            .json(&build_text_body(content))
+            .send()
+            .map_err(|error| format!("wecom webhook POST failed: {error}"))?;
+        let status = resp.status_code();
+        if !(200..300).contains(&status) {
+            return Err(format!(
+                "wecom webhook POST failed ({status}): {}",
+                response_detail(resp)
+            ));
+        }
+        let value = resp
+            .json()
+            .map_err(|error| format!("wecom response JSON failed: {error}"))?;
+        check_api_response(&value)
     }
 
-    struct SourceOnlyChannel;
+    struct WeComChannel;
 
-    impl PluginInfo for SourceOnlyChannel {
+    impl PluginInfo for WeComChannel {
         fn plugin_name() -> String {
-            PLUGIN_NAME.to_string()
+            CHANNEL.to_string()
         }
 
         fn plugin_version() -> String {
@@ -64,42 +68,44 @@ mod component {
         }
     }
 
-    impl Channel for SourceOnlyChannel {
+    impl Channel for WeComChannel {
         fn name() -> String {
-            PLUGIN_NAME.to_string()
+            CHANNEL.to_string()
         }
 
         fn configure(config: String) -> Result<(), String> {
-            CONFIG.with(|c| *c.borrow_mut() = SourceOnlyConfig::from_json(&config));
+            CONFIG.with(|state| *state.borrow_mut() = WeComConfig::from_json(&config));
             Ok(())
         }
 
-        fn send(_message: SendMessage) -> Result<(), String> {
-            Err(send_unavailable())
+        fn send(message: SendMessage) -> Result<(), String> {
+            if !message.attachments.is_empty() {
+                return Err(
+                    "wecom: media attachments are not supported by Bot Webhook mode".into(),
+                );
+            }
+            let cfg = CONFIG.with(|state| state.borrow().clone());
+            send_text(&cfg, &message.content)
         }
 
         fn poll_message() -> Option<InboundMessage> {
-            inbound::inbound_poll().map(from_host)
+            None
         }
 
         fn get_channel_capabilities() -> ChannelCapabilities {
             ChannelCapabilities::HEALTH_CHECK
-                | ChannelCapabilities::SELF_HANDLE
-                | ChannelCapabilities::SELF_ADDRESSED_MENTION
         }
 
         fn health_check() -> bool {
-            false
+            CONFIG.with(|state| state.borrow().is_configured())
         }
 
         fn self_handle() -> Option<String> {
-            CONFIG.with(|c| c.borrow().self_handle.clone())
+            None
         }
-
         fn self_addressed_mention() -> Option<String> {
-            CONFIG.with(|c| c.borrow().self_handle.clone())
+            None
         }
-
         fn drop_self_message(_msg: InboundMessage) -> bool {
             false
         }
@@ -162,7 +168,7 @@ mod component {
             Ok(None)
         }
         fn supports_free_form_ask() -> bool {
-            false
+            true
         }
         fn webhook_path() -> Option<String> {
             None
@@ -171,11 +177,9 @@ mod component {
             _headers: Vec<(String, String)>,
             _body: Vec<u8>,
         ) -> Result<Vec<InboundMessage>, String> {
-            Err(format!(
-                "{PLUGIN_NAME}: webhook ingress is not implemented in this source-only scaffold"
-            ))
+            Err("wecom Bot Webhook mode is send-only".to_string())
         }
     }
 
-    export!(SourceOnlyChannel);
+    export!(WeComChannel);
 }

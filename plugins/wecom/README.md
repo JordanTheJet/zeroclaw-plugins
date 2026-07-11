@@ -1,25 +1,28 @@
-# wecom - ZeroClaw channel plugin source
+# WeCom Bot Webhook channel plugin
 
-This directory is the Phase 4 migration landing point for the built-in
-`wecom` channel. The manifest declares `provides = "wecom"`, so
-when it becomes publishable it will read the existing `[channels.wecom.*]`
-configuration as the single source of truth and honor the native-wins policy.
+This plugin mirrors `[channels.wecom.<alias>]` through `provides = "wecom"` and
+implements the same send-only Bot Webhook mode as ZeroClaw's native channel.
+Text is posted through the host's `wasi:http` implementation, and both HTTP and
+WeCom JSON error responses are surfaced to the caller.
 
-Current status: **source-only / host-gated**. The plugin exports the channel WIT
-surface, parses configuration, reports identity metadata, and can drain messages
-that a future host-managed listener queues for it. Direct send/poll transport is
-not published yet:
+## Configuration
 
-WeCom HTTP/webhook parity is source-only until the host webhook-ingress path is released for plugins.
+```toml
+[channels.wecom.default]
+enabled = true
+webhook_key = "<encrypted bot webhook key>"
+```
 
-Because `registry = false`, CI keeps this source in the repo but does not build,
-package, or advertise it in `registry.json`. Remove that guard only when protocol
-parity has tests and the required host capability is available to stock hosts.
+The recipient field is ignored because a WeCom webhook key is bound to one bot
+conversation. For inbound messages and active-session replies, use the separate
+`wecom-ws` channel, which remains source-only until WebSocket host support lands.
 
-## Build
+## Validation
 
 ```bash
+cargo fmt --check
 cargo test
-rustup target add wasm32-wasip2
+cargo clippy --all-targets -- -D warnings
 cargo build --target wasm32-wasip2 --release
+cargo clippy --target wasm32-wasip2 -- -D warnings
 ```

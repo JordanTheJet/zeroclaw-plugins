@@ -1,87 +1,98 @@
-//! Pure WeCom source-only channel migration logic.
-//!
-//! This module is deliberately host-testable and performs no I/O. The wasm shim
-//! owns the WIT boundary; transport work stays host-gated until the native
-//! WeCom channel is fully ported into a publishable plugin.
+//! Pure WeCom Bot Webhook logic. The WASM shim owns the HTTP request.
 
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 pub const CHANNEL: &str = "wecom";
-pub const PLUGIN_NAME: &str = "wecom";
-pub const HOST_GATE: &str = "WeCom HTTP/webhook parity is source-only until the host webhook-ingress path is released for plugins.";
+const WEBHOOK_BASE: &str = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send";
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SourceOnlyConfig {
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+pub struct WeComConfig {
+    #[serde(default)]
     pub enabled: bool,
-    pub self_handle: Option<String>,
+    #[serde(default)]
+    pub webhook_key: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct RawConfig {
-    #[serde(default = "default_enabled")]
-    enabled: bool,
-    #[serde(default)]
-    self_handle: Option<String>,
-    #[serde(default)]
-    bot_username: Option<String>,
-    #[serde(default)]
-    username: Option<String>,
-    #[serde(default)]
-    handle: Option<String>,
-    #[serde(default)]
-    user_id: Option<String>,
-    #[serde(default)]
-    account_id: Option<String>,
-}
-
-fn default_enabled() -> bool {
-    true
-}
-
-impl SourceOnlyConfig {
+impl WeComConfig {
     pub fn from_json(input: &str) -> Self {
-        let raw = serde_json::from_str::<RawConfig>(input).unwrap_or_else(|_| RawConfig {
-            enabled: true,
-            self_handle: None,
-            bot_username: None,
-            username: None,
-            handle: None,
-            user_id: None,
-            account_id: None,
-        });
-        Self {
-            enabled: raw.enabled,
-            self_handle: first_non_empty(&[
-                raw.self_handle,
-                raw.bot_username,
-                raw.username,
-                raw.handle,
-                raw.user_id,
-                raw.account_id,
-            ]),
+        serde_json::from_str(input).unwrap_or_default()
+    }
+
+    pub fn webhook_key(&self) -> &str {
+        self.webhook_key.trim()
+    }
+
+    pub fn is_configured(&self) -> bool {
+        !self.webhook_key().is_empty()
+    }
+}
+
+pub fn webhook_url(key: &str) -> String {
+    format!(
+        "{WEBHOOK_BASE}?key={}",
+        utf8_percent_encode(key.trim(), NON_ALPHANUMERIC)
+    )
+}
+
+pub fn build_text_body(content: &str) -> Value {
+    json!({
+        "msgtype": "text",
+        "text": {
+            "content": content,
         }
+    })
+}
+
+pub fn check_api_response(value: &Value) -> Result<(), String> {
+    let errcode = value.get("errcode").and_then(Value::as_i64).unwrap_or(-1);
+    if errcode == 0 {
+        return Ok(());
     }
+    let message = value
+        .get("errmsg")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown error");
+    Err(format!("wecom API error (errcode={errcode}): {message}"))
 }
 
-pub fn first_non_empty(values: &[Option<String>]) -> Option<String> {
-    values
-        .iter()
-        .filter_map(|v| v.as_deref())
-        .map(str::trim)
-        .find(|v| !v.is_empty())
-        .map(ToOwned::to_owned)
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-pub fn has_config(input: &str) -> bool {
-    match serde_json::from_str::<Value>(input) {
-        Ok(Value::Object(map)) => map.iter().any(|(key, value)| {
-            key != "enabled" && !value.is_null() && value.as_str().map(str::is_empty) != Some(true)
-        }),
-        _ => false,
+    #[test]
+    fn config_uses_native_webhook_key() {
+        let cfg = WeComConfig::from_json(
+            r#"{"enabled":true,"webhook_key":" key-123 ","excluded_tools":["shell"]}"#,
+        );
+        assert!(cfg.is_configured());
+        assert_eq!(cfg.webhook_key(), "key-123");
     }
-}
 
-pub fn send_unavailable() -> String {
-    format!("{PLUGIN_NAME} ({CHANNEL}): source-only channel migration is host-gated. {HOST_GATE}")
+    #[test]
+    fn webhook_url_encodes_key_as_query_value() {
+        assert_eq!(
+            webhook_url("abc/123+z"),
+            "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=abc%2F123%2Bz"
+        );
+    }
+
+    #[test]
+    fn text_body_matches_wecom_contract() {
+        let body = build_text_body("hello");
+        assert_eq!(body["msgtype"], "text");
+        assert_eq!(body["text"]["content"], "hello");
+    }
+
+    #[test]
+    fn response_requires_zero_errcode() {
+        assert!(check_api_response(&json!({"errcode": 0, "errmsg": "ok"})).is_ok());
+        assert_eq!(
+            check_api_response(&json!({"errcode": 93000, "errmsg": "invalid webhook"}))
+                .unwrap_err(),
+            "wecom API error (errcode=93000): invalid webhook"
+        );
+        assert!(check_api_response(&json!({})).is_err());
+    }
 }
