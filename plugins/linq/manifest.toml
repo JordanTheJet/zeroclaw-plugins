@@ -4,6 +4,8 @@ description = "Linq (Partner V3 API: iMessage/RCS/SMS) channel plugin for ZeroCl
 author = "JordanTheJet"
 wasm_path = "linq.wasm"
 capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
 # http_client: outbound calls to the Linq Partner API (TLS is performed host-side).
 # config_read: read this channel's settings + secrets (api_token, from_phone,
 # signing_secret) from its config section.

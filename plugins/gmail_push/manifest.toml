@@ -4,6 +4,8 @@ description = "Gmail Pub/Sub push channel plugin for ZeroClaw: authenticated pus
 author = "JordanTheJet"
 wasm_path = "gmail_push.wasm"
 capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
 # http_client: Gmail API calls (users.watch, history, messages.get, messages.send;
 # TLS is performed host-side).
 # config_read: read this channel's settings + secrets (oauth_token, topic,

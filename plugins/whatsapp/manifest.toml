@@ -4,6 +4,8 @@ description = "WhatsApp Cloud (Meta Graph) channel plugin for ZeroClaw: webhook 
 author = "JordanTheJet"
 wasm_path = "whatsapp.wasm"
 capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
 # http_client: outbound calls to the Meta Graph API (graph.facebook.com; TLS is
 # performed host-side).
 # config_read: read this channel's settings + secrets (access_token, app_secret,

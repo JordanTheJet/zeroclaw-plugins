@@ -4,6 +4,8 @@ description = "Nextcloud Talk channel plugin for ZeroClaw: bot-webhook ingest (H
 author = "JordanTheJet"
 wasm_path = "nextcloud.wasm"
 capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
 # http_client: outbound OCS API calls to the Nextcloud server (TLS is performed
 # host-side).
 # config_read: read base_url + app_token + webhook_secret + bot_name from this

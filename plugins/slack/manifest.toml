@@ -4,6 +4,8 @@ description = "Slack channel plugin for ZeroClaw: Events API webhook ingest (HMA
 author = "JordanTheJet"
 wasm_path = "slack.wasm"
 capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
 # http_client: outbound chat.postMessage calls to the Slack Web API
 # (slack.com/api; TLS is performed host-side).
 # config_read: read bot_token + signing_secret + api_base_url from this

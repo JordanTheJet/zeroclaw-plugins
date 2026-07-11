@@ -4,6 +4,8 @@ description = "Generic inbound Webhook channel plugin for ZeroClaw: signed HTTP 
 author = "JordanTheJet"
 wasm_path = "webhook.wasm"
 capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
 # http_client: outbound reply POST/PUT to the configured send_url (TLS host-side).
 # config_read: read this channel's settings + secret (send_url, send_method,
 # auth_header, secret) from its config section.
