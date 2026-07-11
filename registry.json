@@ -23,17 +23,6 @@
       "sha256": "4ae5e9439d987269b596ea9d5aac313e5ac9e7cabcfe36bffd2f9d9673db7664"
     },
     {
-      "name": "lark",
-      "version": "0.1.0",
-      "description": "Lark / Feishu channel plugin for ZeroClaw: webhook ingress + im/v1/messages send over wasi:http.",
-      "author": "JordanTheJet",
-      "capabilities": [
-        "channel"
-      ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/lark-0.1.0.zip",
-      "sha256": "123e163726e1fe3b05dcc0704c55e3d2aef1f2b1a6d22fcadbead9b8998b25c0"
-    },
-    {
       "name": "mattermost",
       "version": "0.1.0",
       "description": "Mattermost channel plugin for ZeroClaw: v4 REST channel-post polling + createPost over wasi:http.",
@@ -54,17 +43,6 @@
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/mochat-0.1.0.zip",
       "sha256": "d7ba5f552a304a88a8a27887b6f306171192c516fc53e2b37a8d422d25ff950d"
-    },
-    {
-      "name": "nextcloud",
-      "version": "0.1.0",
-      "description": "Nextcloud Talk channel plugin for ZeroClaw: bot-webhook ingest (HMAC-SHA256 verified) + OCS chat send over wasi:http.",
-      "author": "JordanTheJet",
-      "capabilities": [
-        "channel"
-      ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/nextcloud-0.1.0.zip",
-      "sha256": "2ea392aa0509ef65121dff2120c1d383b8dfdcaea59d8b33869ec4c6c387ab87"
     },
     {
       "name": "notion",
@@ -100,17 +78,6 @@
       "sha256": "a6964c868299a20e0337aac597ddf502a93ed53cb83aee6a3aaca4ef9edc06a1"
     },
     {
-      "name": "slack",
-      "version": "0.1.0",
-      "description": "Slack channel plugin for ZeroClaw: Events API webhook ingest (HMAC-verified) + chat.postMessage over wasi:http.",
-      "author": "JordanTheJet",
-      "capabilities": [
-        "channel"
-      ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/slack-0.1.0.zip",
-      "sha256": "fabf2edc0d13a62355f3fa68af5d0f6c22cacb422a022393e608dedc3cf32c3e"
-    },
-    {
       "name": "telegram",
       "version": "0.1.0",
       "description": "Telegram channel plugin for ZeroClaw: getUpdates long-poll + sendMessage over wasi:http.",
@@ -133,17 +100,6 @@
       "sha256": "d8a4a795da05f557e17eeb378b98906b0112d5fc59f8a078c4290f42c95b8e1c"
     },
     {
-      "name": "wati",
-      "version": "0.1.0",
-      "description": "WATI (WhatsApp Business API) channel plugin for ZeroClaw: webhook ingress (host-routed) + text send over wasi:http.",
-      "author": "JordanTheJet",
-      "capabilities": [
-        "channel"
-      ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wati-0.1.0.zip",
-      "sha256": "d19f7a0c34be188fe8975cddc6eb75a10332159d6ab3d2f075933774eb9cea7e"
-    },
-    {
       "name": "wechat",
       "version": "0.1.0",
       "description": "WeChat (iLink Bot) channel plugin for ZeroClaw: getUpdates long-poll + sendMessage over wasi:http.",
@@ -153,17 +109,6 @@
       ],
       "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/wechat-0.1.0.zip",
       "sha256": "a85ae6f57d50f67fb668671a1fdc7580334c66f6204d874a854a5c1133a15fdc"
-    },
-    {
-      "name": "whatsapp",
-      "version": "0.1.0",
-      "description": "WhatsApp Cloud (Meta Graph) channel plugin for ZeroClaw: webhook verification + signed inbound events + sendMessage over wasi:http.",
-      "author": "JordanTheJet",
-      "capabilities": [
-        "channel"
-      ],
-      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/whatsapp-0.1.0.zip",
-      "sha256": "4f37f75846716e9b6d19509881ce719e47d0eb6e8a99a572f0311b1e523aa1d0"
     }
   ]
 }
