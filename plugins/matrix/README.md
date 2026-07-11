@@ -1,25 +1,47 @@
-# matrix - ZeroClaw channel plugin source
+# Matrix channel plugin
 
-This directory is the Phase 4 migration landing point for the built-in
-`matrix` channel. The manifest declares `provides = "matrix"`, so
-when it becomes publishable it will read the existing `[channels.matrix.*]`
-configuration as the single source of truth and honor the native-wins policy.
+This plugin mirrors the built-in `matrix` channel through `provides = "matrix"`
+and reads the existing `[channels.matrix.<alias>]` configuration. It talks to
+the Matrix Client-Server API through the host's `wasi:http` implementation.
 
-Current status: **source-only / host-gated**. The plugin exports the channel WIT
-surface, parses configuration, reports identity metadata, and can drain messages
-that a future host-managed listener queues for it. Direct send/poll transport is
-not published yet:
+## Supported
 
-Matrix sync, crypto/session storage, and send semantics require a dedicated plugin port before this source-only plugin can publish.
+- access-token authentication and `/account/whoami` health checks
+- startup backlog suppression followed by incremental `/sync` polling
+- unencrypted `m.text` messages in joined rooms
+- exact `allowed_rooms` filtering and `mention_only` handling
+- room-ID or room-alias recipients
+- top-level and threaded text replies
 
-Because `registry = false`, CI keeps this source in the repo but does not build,
-package, or advertise it in `registry.json`. Remove that guard only when protocol
-parity has tests and the required host capability is available to stock hosts.
+## Current limits
 
-## Build
+- encrypted rooms and recovery keys are not supported
+- password login is not supported; configure `access_token`
+- media, edits, reactions, typing indicators, and progressive drafts are not supported
+
+Unsupported events are ignored rather than delivered with incomplete content.
+
+## Configuration
+
+```toml
+[channels.matrix.default]
+enabled = true
+homeserver = "https://matrix.example.org"
+access_token = "<encrypted secret>"
+user_id = "@zeroclaw:example.org"
+allowed_rooms = ["!room:example.org"]
+mention_only = false
+reply_in_thread = true
+```
+
+`user_id` is optional because the plugin resolves it with `/account/whoami`.
+
+## Validation
 
 ```bash
-cargo test
-rustup target add wasm32-wasip2
+cargo fmt --check
+cargo test --lib
+cargo clippy --all-targets -- -D warnings
 cargo build --target wasm32-wasip2 --release
+cargo clippy --target wasm32-wasip2 -- -D warnings
 ```

@@ -1,13 +1,12 @@
 # Standalone crate (own [workspace]): built for wasm32-wasip2 as a channel
 # plugin component; the pure matrix core (rlib) is host-tested with plain
-# cargo test. This source-only migration scaffold intentionally performs no
-# network I/O until the host exposes the required transport capability.
+# cargo test. `waki` provides blocking wasi:http only in the WASM component.
 [package]
 name = "matrix"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Matrix channel plugin source for ZeroClaw: host-gated Matrix adapter scaffold."
+description = "Matrix channel plugin for ZeroClaw: Client-Server sync + text send over wasi:http."
 publish = false
 
 [lib]
@@ -17,6 +16,10 @@ crate-type = ["cdylib", "rlib"]
 wit-bindgen = "0.46"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+percent-encoding = "2"
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+waki = { version = "0.5.1", features = ["json"] }
 
 [profile.release]
 opt-level = "s"

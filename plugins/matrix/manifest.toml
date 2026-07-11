@@ -1,14 +1,13 @@
 name = "matrix"
 version = "0.1.0"
-description = "Matrix channel plugin source for ZeroClaw: host-gated Matrix adapter scaffold."
+description = "Matrix channel plugin for ZeroClaw: Client-Server sync + text send over wasi:http."
 author = "JordanTheJet"
 wasm_path = "matrix.wasm"
 capabilities = ["channel"]
-# Host-gated source: keep the migration source in this repo, but do not publish
-# it into registry.json until the native transport/API parity is implemented.
-registry = false
+# http_client: Matrix Client-Server API sync, whoami, room alias resolution,
+# and text sends. TLS is performed host-side.
 # config_read: read [channels.matrix.*] when loaded as a mirror plugin.
-permissions = ["config_read"]
+permissions = ["http_client", "config_read"]
 # provides: mirror the built-in `matrix` channel — read the existing
 # channel config as the single source of truth and honor native-wins.
 provides = "matrix"

@@ -23,6 +23,17 @@
       "sha256": "4ae5e9439d987269b596ea9d5aac313e5ac9e7cabcfe36bffd2f9d9673db7664"
     },
     {
+      "name": "matrix",
+      "version": "0.1.0",
+      "description": "Matrix channel plugin for ZeroClaw: Client-Server sync + text send over wasi:http.",
+      "author": "JordanTheJet",
+      "capabilities": [
+        "channel"
+      ],
+      "url": "https://github.com/zeroclaw-labs/zeroclaw-plugins/releases/download/plugins/matrix-0.1.0.zip",
+      "sha256": "4230a18bec270dca9c6e6b9d822c8e8dcf3bb8d7df7bccc11d017ff21bc730e8"
+    },
+    {
       "name": "mattermost",
       "version": "0.1.0",
       "description": "Mattermost channel plugin for ZeroClaw: v4 REST channel-post polling + createPost over wasi:http.",
