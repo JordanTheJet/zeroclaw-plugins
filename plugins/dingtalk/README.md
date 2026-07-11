@@ -1,25 +1,36 @@
-# dingtalk - ZeroClaw channel plugin source
+# DingTalk channel plugin
 
-This directory is the Phase 4 migration landing point for the built-in
-`dingtalk` channel. The manifest declares `provides = "dingtalk"`, so
-when it becomes publishable it will read the existing `[channels.dingtalk.*]`
-configuration as the single source of truth and honor the native-wins policy.
+This plugin mirrors `[channels.dingtalk.<alias>]` through `provides =
+"dingtalk"`. It implements DingTalk Stream Mode rather than a webhook listener:
 
-Current status: **source-only / host-gated**. The plugin exports the channel WIT
-surface, parses configuration, reports identity metadata, and can drain messages
-that a future host-managed listener queues for it. Direct send/poll transport is
-not published yet:
+1. register `client_id` and `client_secret` with the gateway API;
+2. connect to the returned WebSocket endpoint through the host `ws-client`;
+3. acknowledge system and callback frames;
+4. deliver inbound text with private/group reply routing;
+5. reply through the `sessionWebhook` supplied with each inbound message.
 
-DingTalk robot send/webhook parity is source-only until the host webhook-ingress path is released for plugins.
+The implementation is real but remains `registry = false` until ZeroClaw's
+host-mediated WebSocket capability lands on upstream master. It builds and runs
+against the `channel-to-plugin` host branch that provides `ws-client`.
 
-Because `registry = false`, CI keeps this source in the repo but does not build,
-package, or advertise it in `registry.json`. Remove that guard only when protocol
-parity has tests and the required host capability is available to stock hosts.
+## Configuration
 
-## Build
+```toml
+[channels.dingtalk.default]
+enabled = true
+client_id = "<DingTalk AppKey>"
+client_secret = "<encrypted AppSecret>"
+```
+
+Outbound messages require a prior inbound message for that chat because
+DingTalk creates the session reply URL dynamically.
+
+## Validation
 
 ```bash
+cargo fmt --check
 cargo test
-rustup target add wasm32-wasip2
+cargo clippy --all-targets -- -D warnings
 cargo build --target wasm32-wasip2 --release
+cargo clippy --target wasm32-wasip2 -- -D warnings
 ```

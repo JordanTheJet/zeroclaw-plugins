@@ -1,13 +1,12 @@
 # Standalone crate (own [workspace]): built for wasm32-wasip2 as a channel
 # plugin component; the pure dingtalk core (rlib) is host-tested with plain
-# cargo test. This source-only migration scaffold intentionally performs no
-# network I/O until the host exposes the required transport capability.
+# cargo test. HTTP and WebSocket transport dependencies are WASM-only.
 [package]
 name = "dingtalk"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "DingTalk channel plugin source for ZeroClaw: host-gated adapter scaffold for DingTalk robot messaging."
+description = "DingTalk Stream Mode channel plugin for ZeroClaw: gateway WebSocket + session-webhook replies."
 publish = false
 
 [lib]
@@ -17,6 +16,10 @@ crate-type = ["cdylib", "rlib"]
 wit-bindgen = "0.46"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+percent-encoding = "2"
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+waki = { version = "0.5.1", features = ["json"] }
 
 [profile.release]
 opt-level = "s"

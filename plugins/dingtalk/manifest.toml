@@ -1,14 +1,17 @@
 name = "dingtalk"
 version = "0.1.0"
-description = "DingTalk channel plugin source for ZeroClaw: host-gated adapter scaffold for DingTalk robot messaging."
+description = "DingTalk Stream Mode channel plugin for ZeroClaw: gateway WebSocket + session-webhook replies."
 author = "JordanTheJet"
 wasm_path = "dingtalk.wasm"
 capabilities = ["channel"]
-# Host-gated source: keep the migration source in this repo, but do not publish
-# it into registry.json until the native transport/API parity is implemented.
+sender_match = "exact"
+# Real implementation, kept source-only until ZeroClaw's websocket-client host
+# capability reaches upstream master.
 registry = false
+# http_client: gateway registration and per-message session-webhook replies.
+# websocket_client: DingTalk Stream Mode callback frames.
 # config_read: read [channels.dingtalk.*] when loaded as a mirror plugin.
-permissions = ["config_read"]
+permissions = ["http_client", "websocket_client", "config_read"]
 # provides: mirror the built-in `dingtalk` channel — read the existing
 # channel config as the single source of truth and honor native-wins.
 provides = "dingtalk"
