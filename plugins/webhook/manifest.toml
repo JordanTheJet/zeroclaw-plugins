@@ -1,0 +1,17 @@
+name = "webhook"
+version = "0.1.0"
+description = "Generic inbound Webhook channel plugin for ZeroClaw: signed HTTP ingress + configurable outbound POST/PUT over wasi:http."
+author = "JordanTheJet"
+wasm_path = "webhook.wasm"
+capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
+# http_client: outbound reply POST/PUT to the configured send_url (TLS host-side).
+# config_read: read this channel's settings + secret (send_url, send_method,
+# auth_header, secret) from its config section.
+permissions = ["http_client", "config_read"]
+# provides: mirror the built-in `webhook` channel — read [channels.webhook.*] and
+# honor native-wins. The plugin serves inbound over the host webhook route
+# (/plugin/webhook); requires a host with the webhook-ingress capability
+# (zeroclaw#8862).
+provides = "webhook"

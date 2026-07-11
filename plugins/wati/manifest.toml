@@ -4,6 +4,8 @@ description = "WATI (WhatsApp Business API) channel plugin for ZeroClaw: webhook
 author = "JordanTheJet"
 wasm_path = "wati.wasm"
 capabilities = ["channel"]
+# Source-only until ZeroClaw exposes webhook ingress to channel plugins.
+registry = false
 # http_client: outbound calls to the WATI API (TLS is performed host-side).
 # config_read: read this channel's settings + secret (api_token, api_url,
 # tenant_id) from its config section.

@@ -1,14 +1,14 @@
 # Standalone crate (own [workspace]): built for wasm32-wasip2 as a channel
-# plugin component; the pure `linq` core (rlib) is host-tested with plain
+# plugin component; the pure `webhook` core (rlib) is host-tested with plain
 # `cargo test`. `waki` (the blocking wasi:http client) is a wasm-only dep so the
-# host test build never tries to compile it. The X-Webhook-Signature is
+# host test build never tries to compile it. The inbound X-Webhook-Signature is
 # HMAC-SHA256 (hex) via pure-Rust `hmac`/`sha2`/`hex` (host + wasm).
 [package]
-name = "linq"
+name = "webhook"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Linq (Partner V3 API: iMessage/RCS/SMS) channel plugin for ZeroClaw: signed webhook ingress + text send over wasi:http."
+description = "Generic inbound Webhook channel plugin for ZeroClaw: signed HTTP ingress + configurable outbound POST/PUT over wasi:http."
 publish = false
 
 [lib]
