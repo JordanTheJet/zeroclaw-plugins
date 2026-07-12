@@ -58,6 +58,7 @@ KNOWN_PERMISSIONS = {
     "env_read",  # serde alias for config_read
     "memory_read",
     "memory_write",
+    "socket_client",
     "websocket_client",
 }
 
