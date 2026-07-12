@@ -1,13 +1,12 @@
 # Standalone crate (own [workspace]): built for wasm32-wasip2 as a channel
-# plugin component; the pure amqp core (rlib) is host-tested with plain
-# cargo test. This source-only migration scaffold intentionally performs no
-# network I/O until the host exposes the required transport capability.
+# plugin component; the pure AMQP codec/state machine is host-tested with
+# plain cargo test. Raw TCP/TLS is supplied by the host socket WIT import.
 [package]
 name = "amqp"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "AMQP channel plugin source for ZeroClaw: host-gated RabbitMQ-style inbound/outbound adapter scaffold."
+description = "AMQP 0-9-1 channel plugin for ZeroClaw over host-mediated TCP/TLS."
 publish = false
 
 [lib]
@@ -17,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 wit-bindgen = "0.46"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+bytes = "1"
 
 [profile.release]
 opt-level = "s"
