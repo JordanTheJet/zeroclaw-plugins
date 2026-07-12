@@ -1,14 +1,16 @@
 name = "email"
 version = "0.1.0"
-description = "Email channel plugin source for ZeroClaw: host-gated IMAP/SMTP adapter scaffold."
+description = "Text-only IMAP/SMTP email channel over host-mediated TCP and implicit TLS."
 author = "JordanTheJet"
 wasm_path = "email.wasm"
 capabilities = ["channel"]
-# Host-gated source: keep the migration source in this repo, but do not publish
-# it into registry.json until the native transport/API parity is implemented.
+sender_match = "email"
+# Real implementation, kept source-only until ZeroClaw's socket-client host
+# capability reaches upstream master.
 registry = false
+# socket_client: host-mediated IMAP and SMTP TCP/TLS.
 # config_read: read [channels.email.*] when loaded as a mirror plugin.
-permissions = ["config_read"]
+permissions = ["socket_client", "config_read"]
 # provides: mirror the built-in `email` channel — read the existing
 # channel config as the single source of truth and honor native-wins.
 provides = "email"

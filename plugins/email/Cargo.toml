@@ -1,22 +1,24 @@
 # Standalone crate (own [workspace]): built for wasm32-wasip2 as a channel
-# plugin component; the pure email core (rlib) is host-tested with plain
-# cargo test. This source-only migration scaffold intentionally performs no
-# network I/O until the host exposes the required transport capability.
+# plugin component; the pure email protocol core (rlib) is host-tested with
+# plain cargo test. Network I/O is isolated in the WASM WIT transport shim.
 [package]
 name = "email"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Email channel plugin source for ZeroClaw: host-gated IMAP/SMTP adapter scaffold."
+description = "Email channel plugin for ZeroClaw: text-only IMAP/SMTP over host-mediated sockets."
 publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wit-bindgen = "0.46"
+base64 = "0.22"
+mail-parser = "0.11.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+wit-bindgen = "0.46"
 
 [profile.release]
 opt-level = "s"
