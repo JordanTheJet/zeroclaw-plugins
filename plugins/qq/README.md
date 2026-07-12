@@ -1,25 +1,34 @@
-# qq - ZeroClaw channel plugin source
+# QQ Official Bot channel plugin
 
-This directory is the Phase 4 migration landing point for the built-in
-`qq` channel. The manifest declares `provides = "qq"`, so
-when it becomes publishable it will read the existing `[channels.qq.*]`
-configuration as the single source of truth and honor the native-wins policy.
+This plugin mirrors `[channels.qq.<alias>]` through `provides = "qq"` and
+implements the QQ Official Bot text path:
 
-Current status: **source-only / host-gated**. The plugin exports the channel WIT
-surface, parses configuration, reports identity metadata, and can drain messages
-that a future host-managed listener queues for it. Direct send/poll transport is
-not published yet:
+- OAuth app-access-token acquisition and expiry-aware refresh;
+- gateway discovery over HTTPS;
+- host-mediated WebSocket Identify/Resume and heartbeat frames;
+- C2C and group-at text dispatch with message deduplication;
+- markdown text sends to `user:<openid>` and `group:<openid>` recipients.
 
-QQ webhook/send parity is source-only until the host webhook-ingress path is released for plugins.
+The implementation is real but remains `registry = false` until ZeroClaw's
+`websocket_client` host capability lands upstream. Media upload/download,
+voice transcription, attachments, and the native per-channel `proxy_url`
+override remain explicit follow-up work.
 
-Because `registry = false`, CI keeps this source in the repo but does not build,
-package, or advertise it in `registry.json`. Remove that guard only when protocol
-parity has tests and the required host capability is available to stock hosts.
+## Configuration
 
-## Build
+```toml
+[channels.qq.default]
+enabled = true
+app_id = "<QQ Bot App ID>"
+app_secret = "<encrypted App Secret>"
+```
+
+## Validation
 
 ```bash
+cargo fmt --check
 cargo test
-rustup target add wasm32-wasip2
+cargo clippy --all-targets -- -D warnings
 cargo build --target wasm32-wasip2 --release
+cargo clippy --target wasm32-wasip2 -- -D warnings
 ```
