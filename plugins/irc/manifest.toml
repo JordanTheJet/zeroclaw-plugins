@@ -1,14 +1,16 @@
 name = "irc"
 version = "0.1.0"
-description = "IRC channel plugin source for ZeroClaw: host-gated IRC adapter scaffold."
+description = "IRC channel plugin for ZeroClaw: TLS, registration, SASL, and text chat."
 author = "JordanTheJet"
 wasm_path = "irc.wasm"
 capabilities = ["channel"]
-# Host-gated source: keep the migration source in this repo, but do not publish
-# it into registry.json until the native transport/API parity is implemented.
+sender_match = "case-insensitive"
+# Real text implementation, kept source-only until ZeroClaw's socket-client
+# host capability reaches upstream master.
 registry = false
+# socket_client: IRC registration and chat over host-mediated TLS.
 # config_read: read [channels.irc.*] when loaded as a mirror plugin.
-permissions = ["config_read"]
+permissions = ["socket_client", "config_read"]
 # provides: mirror the built-in `irc` channel — read the existing
 # channel config as the single source of truth and honor native-wins.
 provides = "irc"

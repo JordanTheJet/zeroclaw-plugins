@@ -1,13 +1,11 @@
 # Standalone crate (own [workspace]): built for wasm32-wasip2 as a channel
-# plugin component; the pure irc core (rlib) is host-tested with plain
-# cargo test. This source-only migration scaffold intentionally performs no
-# network I/O until the host exposes the required transport capability.
+# plugin component; the pure IRC state machine is host-tested with cargo test.
 [package]
 name = "irc"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "IRC channel plugin source for ZeroClaw: host-gated IRC adapter scaffold."
+description = "IRC channel plugin for ZeroClaw: TLS, registration, SASL, and text chat."
 publish = false
 
 [lib]

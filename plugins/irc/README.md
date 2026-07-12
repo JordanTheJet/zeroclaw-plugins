@@ -1,25 +1,39 @@
-# irc - ZeroClaw channel plugin source
+# IRC channel plugin
 
-This directory is the Phase 4 migration landing point for the built-in
-`irc` channel. The manifest declares `provides = "irc"`, so
-when it becomes publishable it will read the existing `[channels.irc.*]`
-configuration as the single source of truth and honor the native-wins policy.
+This plugin mirrors `[channels.irc.<alias>]` through `provides = "irc"` and
+implements the IRC text path over the host-mediated socket capability:
 
-Current status: **source-only / host-gated**. The plugin exports the channel WIT
-surface, parses configuration, reports identity metadata, and can drain messages
-that a future host-managed listener queues for it. Direct send/poll transport is
-not published yet:
+- verified TLS connection and IRC registration;
+- optional server password, SASL PLAIN, and NickServ identification;
+- nickname collision recovery and configured channel joins;
+- PING/PONG, channel and direct `PRIVMSG` receive/send;
+- mention-only filtering, line-length splitting, and command-injection checks.
 
-IRC requires host-managed TCP/TLS socket support before this source-only plugin can publish.
+It remains `registry = false` until ZeroClaw's `socket_client` host
+capability reaches upstream. IRC media, DCC, STARTTLS, and insecure
+`verify_tls = false` connections are not supported.
 
-Because `registry = false`, CI keeps this source in the repo but does not build,
-package, or advertise it in `registry.json`. Remove that guard only when protocol
-parity has tests and the required host capability is available to stock hosts.
+## Configuration
 
-## Build
+```toml
+[channels.irc.default]
+enabled = true
+server = "irc.example.net"
+port = 6697
+nickname = "zeroclaw"
+channels = ["#bots"]
+mention_only = false
+```
+
+Optional `username`, `server_password`, `nickserv_password`, and
+`sasl_password` fields match the native channel configuration.
+
+## Validation
 
 ```bash
+cargo fmt --all -- --check
 cargo test
-rustup target add wasm32-wasip2
+cargo clippy --all-targets -- -D warnings
 cargo build --target wasm32-wasip2 --release
+cargo clippy --target wasm32-wasip2 -- -D warnings
 ```
