@@ -1,14 +1,16 @@
 name = "wecom-ws"
 version = "0.1.0"
-description = "WeCom WebSocket channel plugin source for ZeroClaw: host-gated WebSocket adapter scaffold."
+description = "WeCom AI Bot WebSocket channel plugin for ZeroClaw with host-mediated text callbacks and replies."
 author = "JordanTheJet"
 wasm_path = "wecom_ws.wasm"
 capabilities = ["channel"]
-# Host-gated source: keep the migration source in this repo, but do not publish
-# it into registry.json until the native transport/API parity is implemented.
+sender_match = "exact"
+# Real implementation, kept source-only until ZeroClaw's websocket-client host
+# capability reaches upstream master.
 registry = false
+# websocket_client: subscribe, ping, receive callbacks, and send text frames.
 # config_read: read [channels.wecom_ws.*] when loaded as a mirror plugin.
 permissions = ["websocket_client", "config_read"]
-# provides: mirror the built-in `wecom_ws` channel — read the existing
+# provides: mirror the built-in `wecom_ws` channel - read the existing
 # channel config as the single source of truth and honor native-wins.
 provides = "wecom_ws"
