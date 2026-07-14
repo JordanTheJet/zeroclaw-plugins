@@ -183,18 +183,14 @@ pub fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str
 
 // ── Webhook ingest ──────────────────────────────────────────────────────────────
 
-/// Verify and decode a raw inbound webhook. This is the plugin's authenticity
-/// gate: when a `webhook_secret` is configured it verifies the HMAC signature
-/// over `body` and returns `Err(reason)` on failure (the host then replies
-/// 401/400 and enqueues nothing). When no secret is configured it accepts
-/// unsigned — mirroring the native channel.
-///
-/// `headers` are lower-cased; `body` is the exact received bytes.
-pub fn parse_webhook(
+/// Authenticate a raw inbound webhook. When a `webhook_secret` is configured,
+/// verify the HMAC over the exact request body; otherwise accept unsigned input
+/// to mirror the native channel.
+pub fn authenticate_webhook(
     headers: &[(String, String)],
     body: &[u8],
     cfg: &NextcloudConfig,
-) -> Result<Vec<Inbound>, String> {
+) -> Result<(), String> {
     let secret = cfg.webhook_secret();
     if !secret.is_empty() {
         let random = header(headers, RANDOM_HEADER).unwrap_or("");
@@ -203,10 +199,26 @@ pub fn parse_webhook(
             return Err("nextcloud: webhook signature verification failed".to_string());
         }
     }
+    Ok(())
+}
 
+/// Decode an already-authenticated Nextcloud Talk webhook body.
+pub fn decode_webhook(body: &[u8], cfg: &NextcloudConfig) -> Result<Vec<Inbound>, String> {
     let payload: Value = serde_json::from_slice(body)
         .map_err(|e| format!("nextcloud: invalid JSON payload: {e}"))?;
     Ok(decode_inbound(&payload, &cfg.bot_name()))
+}
+
+/// Authenticate and decode a raw webhook. The split helpers are also exposed so
+/// the WIT shim can preserve the host's typed authentication and payload-
+/// rejection boundary.
+pub fn parse_webhook(
+    headers: &[(String, String)],
+    body: &[u8],
+    cfg: &NextcloudConfig,
+) -> Result<Vec<Inbound>, String> {
+    authenticate_webhook(headers, body, cfg)?;
+    decode_webhook(body, cfg)
 }
 
 /// Decode a Talk bot webhook payload into inbound messages. Routes on the
