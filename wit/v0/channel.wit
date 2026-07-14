@@ -353,15 +353,17 @@ world channel-plugin {
     // Outbound host-mediated WebSocket, for platforms that need a persistent
     // duplex socket (Discord Gateway, Slack Socket Mode). Gated by a distinct
     // unstable feature so the host links it only for plugins granted the
-    // `websocket-client` permission; a plugin that does not enable the feature
+    // `websocket_client` permission; a plugin that does not enable the feature
     // never imports it and is unaffected (adding a world import is
     // backward-compatible — existing components need no rebuild).
     @unstable(feature = plugins-wit-v0-websocket)
     import ws-client;
     // Outbound host-mediated raw TCP (+TLS), for platforms that speak a raw byte
     // protocol over a socket (IRC, email IMAP/SMTP, MQTT, AMQP). Gated by a
-    // distinct unstable feature so the host links it only for plugins granted
-    // the `socket_client` permission.
+    // distinct unstable feature so the host links it only for plugins granted the
+    // `socket_client` permission; a plugin that does not enable the feature never
+    // imports it and is unaffected (adding a world import is backward-compatible —
+    // existing components need no rebuild).
     @unstable(feature = plugins-wit-v0-sockets)
     import socket;
     export plugin-info;
