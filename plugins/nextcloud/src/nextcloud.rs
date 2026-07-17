@@ -3,7 +3,7 @@
 //! This is the `rlib` half of the plugin. It owns everything the sandboxed
 //! component needs that is *not* I/O:
 //!
-//!   * parsing the plugin's `[channels.nextcloud.<alias>]` config section,
+//!   * parsing the plugin's `[channels.nextcloud_talk.<alias>]` config section,
 //!   * verifying the Talk bot webhook HMAC signature over the raw body,
 //!   * decoding a Talk bot webhook payload into inbound messages,
 //!   * building the OCS `sendMessage` request URL + body,
@@ -36,7 +36,8 @@ pub const RANDOM_HEADER: &str = "x-nextcloud-talk-random";
 /// Lower-cased header carrying the hex HMAC-SHA256 signature.
 pub const SIGNATURE_HEADER: &str = "x-nextcloud-talk-signature";
 
-/// The plugin's config section (`[channels.nextcloud.<alias>]` for a mirror, or
+/// The plugin's config section (`[channels.nextcloud_talk.<alias>]` for a mirror,
+/// or
 /// `[[plugins.entries.nextcloud]].config` as a novel plugin). Field names match
 /// the native `NextcloudTalkConfig` snake_case keys so a mirror plugin can be fed
 /// the native section verbatim. Only the fields this v0.1.0 plugin uses are
