@@ -167,8 +167,15 @@ jobs:
           # Upload the generated child to a temporary ref so the Checks API can
           # attach the trusted gate result before that exact commit reaches main.
           attestation_branch="registry-publication/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          trap 'git push origin ":refs/heads/$attestation_branch" >/dev/null 2>&1 || true' EXIT
-          git push origin "HEAD:refs/heads/$attestation_branch"
+          git push \
+            --force-with-lease="refs/heads/$attestation_branch:" \
+            origin "HEAD:refs/heads/$attestation_branch"
+          trap '
+            git push \
+              --force-with-lease="refs/heads/$attestation_branch:$generated_sha" \
+              origin ":refs/heads/$attestation_branch" >/dev/null 2>&1 \
+              || echo "::warning::Could not remove temporary attestation ref $attestation_branch"
+          ' EXIT
 
           check_run=$(gh api --method POST \
             -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -187,6 +194,7 @@ jobs:
             and .status == "completed"
             and .conclusion == "success"
             and .app.slug == "github-actions"
+            and .app.id == 15368
           ' <<< "$check_run" >/dev/null
 
           # Retry only transient push failures. Generated registry bytes are
@@ -208,7 +216,9 @@ jobs:
             if [[ "$attempt" -eq 3 ]]; then
               break
             fi
-            echo "Push failed without a main update; retrying $((attempt + 1))/3."
+            delay=$((attempt * 2))
+            echo "Push failed without a main update; retrying $((attempt + 1))/3 in ${delay}s."
+            sleep "$delay"
           done
 
           echo "::error::Could not push registry.json after three attempts"
