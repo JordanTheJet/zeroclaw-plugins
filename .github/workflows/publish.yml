@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
+      checks: write
       contents: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -127,6 +128,8 @@ jobs:
           echo "Verified every registry URL and digest."
       - name: Commit refreshed registry index
         if: steps.freshness.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -147,6 +150,44 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add registry.json
           git commit -m "chore: refresh plugin registry index"
+
+          generated_sha=$(git rev-parse HEAD)
+          generated_parent=$(git rev-parse HEAD^)
+          generated_paths=$(git diff-tree --no-commit-id --name-only -r HEAD)
+          if [[ "$generated_parent" != "$GITHUB_SHA" ]]; then
+            echo "::error::Generated registry parent $generated_parent is not validated source $GITHUB_SHA"
+            exit 1
+          fi
+          if [[ "$generated_paths" != "registry.json" ]]; then
+            echo "::error::Generated commit has unexpected paths: $generated_paths"
+            exit 1
+          fi
+
+          # Required checks apply to direct pushes as well as pull requests.
+          # Upload the generated child to a temporary ref so the Checks API can
+          # attach the trusted gate result before that exact commit reaches main.
+          attestation_branch="registry-publication/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'git push origin ":refs/heads/$attestation_branch" >/dev/null 2>&1 || true' EXIT
+          git push origin "HEAD:refs/heads/$attestation_branch"
+
+          check_run=$(gh api --method POST \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name="Validate Required Gate" \
+            -f head_sha="$generated_sha" \
+            -f status="completed" \
+            -f conclusion="success" \
+            -f details_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            -f external_id="registry-publication:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" \
+            -f "output[title]=Validated generated registry index" \
+            -f "output[summary]=This commit changes only registry.json to the release ledger verified by publication run $GITHUB_RUN_ID.")
+          jq -e --arg sha "$generated_sha" '
+            .name == "Validate Required Gate"
+            and .head_sha == $sha
+            and .status == "completed"
+            and .conclusion == "success"
+            and .app.slug == "github-actions"
+          ' <<< "$check_run" >/dev/null
 
           # Retry only transient push failures. Generated registry bytes are
           # never rebased across a newer, unvalidated source revision.
