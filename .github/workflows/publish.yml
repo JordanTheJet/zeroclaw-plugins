@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: publish-plugin-registry
+  cancel-in-progress: false
+
 env:
   RELEASE_TAG: plugins
   # Derived from $GITHUB_REPOSITORY in the packaging step so fork runs publish
@@ -25,6 +29,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate registry tooling + canonical metadata
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_*.py'
+          python3 tools/build-registry.py \
+            --source-plugins plugins \
+            --check-metadata registry.json
 
       - name: Install Rust + wasip2 target
         run: |
@@ -43,7 +54,7 @@ jobs:
               continue
             fi
             echo "::group::build $name"
-            ( cd "$dir" && cargo build --target wasm32-wasip2 --release )
+            ( cd "$dir" && cargo build --locked --target wasm32-wasip2 --release )
             wasm=$(grep -E '^wasm_path' "${dir}manifest.toml" | sed -E 's/.*"(.*)".*/\1/')
             built=$(find "${dir}target/wasm32-wasip2/release" -maxdepth 1 -name '*.wasm' | head -1)
             mkdir -p "staged/$name"
@@ -60,7 +71,11 @@ jobs:
           python3 tools/build-registry.py \
             --staged staged \
             --release-base "$release_base" \
+            --existing-registry registry.json \
             --out dist
+          python3 tools/build-registry.py \
+            --source-plugins staged \
+            --check-metadata dist/registry.json
 
       - name: Publish zips to the release
         env:
@@ -68,7 +83,13 @@ jobs:
         run: |
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 \
             || gh release create "$RELEASE_TAG" --title "Plugin artifacts" --notes "Rolling plugin zips for the registry."
-          gh release upload "$RELEASE_TAG" dist/*.zip --clobber
+          if compgen -G 'dist/*.zip' >/dev/null; then
+            # Asset names are immutable `<name>-<version>.zip` identities. No
+            # clobber: an unexpected existing asset fails closed.
+            gh release upload "$RELEASE_TAG" dist/*.zip
+          else
+            echo "No new plugin versions to upload."
+          fi
 
       - name: Commit refreshed registry.json
         run: |

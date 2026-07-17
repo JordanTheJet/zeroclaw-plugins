@@ -1,0 +1,88 @@
+name: Validate plugin repository
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "plugins/**"
+      - "registry.json"
+      - "tools/**"
+      - "wit/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "plugins/**"
+      - "registry.json"
+      - "tools/**"
+      - "wit/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test immutable registry tooling
+        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
+
+      - name: Check generated registry metadata
+        run: |
+          python3 tools/build-registry.py \
+            --source-plugins plugins \
+            --check-metadata registry.json
+
+  components:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + wasip2 target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add wasm32-wasip2
+
+      - name: Test + build every component
+        run: |
+          set -euo pipefail
+          for dir in plugins/*/; do
+            [ -f "${dir}manifest.toml" ] || continue
+            name=$(basename "$dir")
+            echo "::group::validate $name"
+            ( cd "$dir" && cargo test --locked )
+            ( cd "$dir" && cargo build --locked --target wasm32-wasip2 --release )
+            echo "::endgroup::"
+          done
+
+      - name: Stage installable components
+        run: |
+          set -euo pipefail
+          mkdir -p staged
+          for dir in plugins/*/; do
+            [ -f "${dir}manifest.toml" ] || continue
+            if grep -qE '^[[:space:]]*registry[[:space:]]*=[[:space:]]*false' "${dir}manifest.toml"; then
+              continue
+            fi
+            name=$(basename "$dir")
+            wasm=$(grep -E '^wasm_path' "${dir}manifest.toml" | sed -E 's/.*"(.*)".*/\1/')
+            built=$(find "${dir}target/wasm32-wasip2/release" -maxdepth 1 -name '*.wasm' | head -1)
+            mkdir -p "staged/$name"
+            cp "${dir}manifest.toml" "staged/$name/"
+            [ -n "$built" ] && cp "$built" "staged/$name/$wasm"
+            [ -d "${dir}skills" ] && cp -r "${dir}skills" "staged/$name/skills"
+          done
+
+      - name: Refuse overwrites and verify staged metadata
+        run: |
+          python3 tools/build-registry.py \
+            --staged staged \
+            --release-base "https://github.com/${GITHUB_REPOSITORY}/releases/download/plugins" \
+            --existing-registry registry.json \
+            --out dist
+          python3 tools/build-registry.py \
+            --source-plugins staged \
+            --check-metadata dist/registry.json
