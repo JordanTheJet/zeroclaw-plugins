@@ -45,8 +45,10 @@ relays = [
 ```
 
 `private_key` and `relays` are the only channel fields consumed by the plugin.
-When `relays` is empty, the same four public defaults as the native channel are
-used. Outbound recipients may be 64-character hex pubkeys or `npub1...`.
+The host's canonical Nostr config supplies its default relay set when `relays`
+is omitted. An explicitly empty list remains empty, makes the health check fail,
+and opens no network connections. Outbound recipients may be 64-character hex
+pubkeys or `npub1...`.
 
 ## Host gate and limits
 

@@ -24,13 +24,6 @@ type Aes256CbcEncryptor = cbc::Encryptor<Aes256>;
 type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
 type HmacSha256 = Hmac<Sha256>;
 
-pub const DEFAULT_RELAYS: &[&str] = &[
-    "wss://relay.damus.io",
-    "wss://nos.lol",
-    "wss://relay.primal.net",
-    "wss://relay.snort.social",
-];
-
 pub const SUBSCRIPTION_ID: &str = "zeroclaw-dms";
 pub const KIND_NIP04_DM: u32 = 4;
 pub const KIND_SEAL: u32 = 13;
@@ -146,13 +139,7 @@ impl NostrConfig {
             return Err("nostr private_key is required".to_string());
         }
         let keys = NostrKeys::from_private_key(&raw.private_key)?;
-        let mut relays = dedup_nonempty(raw.relays);
-        if relays.is_empty() {
-            relays = DEFAULT_RELAYS
-                .iter()
-                .map(|relay| (*relay).to_string())
-                .collect();
-        }
+        let relays = dedup_nonempty(raw.relays);
         for relay in &relays {
             if !(relay.starts_with("wss://") || relay.starts_with("ws://")) {
                 return Err(format!(
@@ -896,6 +883,12 @@ mod tests {
             "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
         );
         assert!(NostrConfig::from_json(r#"{"private_key":""}"#).is_err());
+        assert!(
+            NostrConfig::from_json(&format!(r#"{{"private_key":"{ALICE_SECRET}"}}"#))
+                .unwrap()
+                .relays
+                .is_empty()
+        );
         assert!(NostrConfig::from_json(&format!(
             r#"{{"private_key":"{ALICE_SECRET}","relays":["https://not-ws"]}}"#
         ))
