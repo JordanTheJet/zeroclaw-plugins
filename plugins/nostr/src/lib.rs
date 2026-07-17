@@ -478,11 +478,12 @@ mod component {
         }
 
         fn health_check() -> bool {
-            CONFIG.with(|stored| {
-                stored
+            STATE.with(|state| {
+                state
                     .borrow()
-                    .as_ref()
-                    .is_some_and(|config| !config.relays.is_empty())
+                    .connections
+                    .iter()
+                    .any(|connection| connection.handle.is_some())
             })
         }
 

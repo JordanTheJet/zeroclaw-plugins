@@ -10,6 +10,8 @@ allowlist. ZeroClaw applies the live `peer_groups` authorization gate to the
 decrypted sender pubkey after the component returns an inbound message. The
 plugin emits canonical 64-character lowercase hex pubkeys and declares exact
 sender matching, so peer entries for this plugin must use that wire form.
+An empty resolved peer set denies every inbound sender; `"*"` is the explicit
+operator opt-in for accepting any valid Nostr pubkey.
 
 ## Behavior
 
@@ -26,6 +28,7 @@ sender matching, so peer entries for this plugin must use that wire form.
   publish queue until relay acknowledgements arrive.
 - Handles NIP-42 relay authentication challenges with signed kind 22242 events,
   then re-subscribes and retries pending publishes after authentication.
+- Reports healthy only while at least one host-owned relay connection is live.
 
 The cryptographic implementation uses pure-Rust RustCrypto primitives so the
 component builds reproducibly for WASI Preview 2. NIP-44 follows the current
