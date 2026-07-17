@@ -50,7 +50,7 @@ mod component {
     use exports::zeroclaw::plugin::plugin_info::Guest as PluginInfo;
 
     const PLUGIN_NAME: &str = "wechat";
-    const PLUGIN_VERSION: &str = "0.1.0";
+    const PLUGIN_VERSION: &str = env!("CARGO_PKG_VERSION");
     /// Server-hold hint (ms) for `getupdates`. `0` asks the server to return
     /// immediately (a short poll), so a blocking call never stalls an
     /// interleaved `send`; if the server ignores the hint it falls back to its

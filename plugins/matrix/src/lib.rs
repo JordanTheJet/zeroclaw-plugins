@@ -30,7 +30,7 @@ mod component {
     };
     use exports::zeroclaw::plugin::plugin_info::Guest as PluginInfo;
 
-    const PLUGIN_VERSION: &str = "0.1.0";
+    const PLUGIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 
     fn initial_transaction_id() -> u64 {
         SystemTime::now()

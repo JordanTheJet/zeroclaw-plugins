@@ -19,7 +19,7 @@ mod component {
     };
     use exports::zeroclaw::plugin::plugin_info::Guest as PluginInfo;
 
-    const PLUGIN_VERSION: &str = "0.1.0";
+    const PLUGIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 
     thread_local! {
         static CONFIG: RefCell<WeComConfig> = RefCell::new(WeComConfig::default());
