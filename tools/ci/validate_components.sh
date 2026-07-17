@@ -267,7 +267,10 @@ for plugin in "$@"; do
       build_rc=125
     fi
 
-    if [[ $registry == true && $build_rc -eq 0 ]]; then
+    # Stage every planned component so the fresh package job can prove that
+    # its directory identities exactly match the canonical shard matrix.
+    # build-registry.py still omits registry=false components from releases.
+    if [[ $build_rc -eq 0 ]]; then
       plugin_stage="$STAGED_DIR/$plugin"
       if [[ -e $plugin_stage ]]; then
         echo "error: staging path already exists: $plugin_stage" \

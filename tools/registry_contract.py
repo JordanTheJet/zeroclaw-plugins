@@ -13,10 +13,18 @@ MAX_PLUGIN_ZIP_BYTES = 50 * 1024 * 1024
 MAX_PLUGIN_EXTRACTED_BYTES = 50 * 1024 * 1024
 
 PLUGIN_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+SEMVER_NUMERIC_IDENTIFIER = r"(?:0|[1-9][0-9]*)"
+SEMVER_PRERELEASE_IDENTIFIER = (
+    rf"(?:{SEMVER_NUMERIC_IDENTIFIER}|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+)
+SEMVER_BUILD_IDENTIFIER = r"[0-9A-Za-z-]+"
 PLUGIN_VERSION_RE = re.compile(
-    r"^[0-9]+\.[0-9]+\.[0-9]+"
-    r"(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?"
-    r"(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$"
+    rf"^{SEMVER_NUMERIC_IDENTIFIER}\."
+    rf"{SEMVER_NUMERIC_IDENTIFIER}\."
+    rf"{SEMVER_NUMERIC_IDENTIFIER}"
+    rf"(?:-{SEMVER_PRERELEASE_IDENTIFIER}"
+    rf"(?:\.{SEMVER_PRERELEASE_IDENTIFIER})*)?"
+    rf"(?:\+{SEMVER_BUILD_IDENTIFIER}(?:\.{SEMVER_BUILD_IDENTIFIER})*)?$"
 )
 WASM_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.wasm$")
 

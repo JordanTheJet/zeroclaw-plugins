@@ -71,15 +71,21 @@ fmt
   Clippy debt remains visible as a warning derived from the delta rather than a
   stored exception list. This is necessary because repairing a published
   same-version component would violate its immutable package digest. Plugins
-  marked `registry = false` receive the same validation but are not staged for
-  publication.
+  marked `registry = false` receive the same validation and are staged as
+  run-internal evidence, but the registry builder omits them from release
+  packages.
 - `package` merges the staged shard artifacts and performs a dry-run registry
-  build. Reusing an existing `<name>@<version>` with different bytes fails
-  closed. The resulting `registry-dry-run` artifact is available for
-  maintainer inspection.
+  build. The staged directory identities must exactly match the existing shard
+  matrix before packaging; missing, substituted, or unexpected components fail
+  closed. Reusing an existing `<name>@<version>` with different bytes also
+  fails closed. The resulting `registry-dry-run` artifact is both available for
+  maintainer inspection and the sole input to publication; publication never
+  creates a second archive from the staged bytes.
 - The gate always runs, aggregates shard results into the GitHub step summary,
-  and fails if any required dependency failed or was cancelled. Legitimately
-  skipped component work, such as a documentation-only change, is a pass.
+  and requires report identities and strictness to match that same shard matrix
+  exactly. It fails if any required dependency failed or was cancelled.
+  Legitimately skipped component work, such as a documentation-only change, is
+  a pass.
 
 The summary identifies the validated commit, selection mode, and plugin count,
 then reports tests, host and WASM Clippy, build status, and artifact size for
@@ -91,7 +97,10 @@ warning for unusually large components.
 The Rust toolchain and `wasm32-wasip2` target are pinned by the workflow rather
 than following `stable`. GitHub Actions are pinned by full commit SHA; their
 source of truth mirrors the corresponding actions in the
-`zeroclaw-labs/zeroclaw` workflows.
+`zeroclaw-labs/zeroclaw` workflows. Registry archives are generated and tested
+inside the immutable Python image named by `tools/ci/packager-image.txt`, with
+network access disabled and an explicit DEFLATE level. A golden archive digest
+detects changes in the complete serialization and compression path.
 
 Plugin crates are independent workspaces with independent lockfiles. Component
 jobs therefore use an explicit shared Cargo target directory and manual cache
@@ -109,10 +118,10 @@ the newest main revision; an active run also exits cleanly before publication
 if it has already been superseded.
 
 The first job calls the reusable validation workflow, which performs a full
-sweep of the merged commit. Publication downloads the staged artifacts from
-that same run and packages those exact validated bytes; it does not rebuild
-components. The release base derives from `GITHUB_REPOSITORY`, so testing in a
-fork targets only that fork's release.
+sweep of the merged commit. Publication downloads the `registry-dry-run` from
+that same run and uploads those exact package bytes; it neither rebuilds
+components nor repackages their output. The release base derives from
+`GITHUB_REPOSITORY`, so testing in a fork targets only that fork's release.
 
 Release assets use immutable `<name>-<version>.zip` identities. Uploads never
 clobber an existing asset: a retry skips an existing asset only after proving

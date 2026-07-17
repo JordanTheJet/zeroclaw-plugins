@@ -27,8 +27,7 @@ class PlanError(ValueError):
     pass
 
 
-def repository_plugins(repository: Path) -> list[str]:
-    plugins_dir = repository / "plugins"
+def plugin_directories(plugins_dir: Path) -> list[str]:
     if not plugins_dir.is_dir():
         raise PlanError(f"plugins directory does not exist: {plugins_dir}")
     plugins = []
@@ -41,6 +40,100 @@ def repository_plugins(repository: Path) -> list[str]:
             raise PlanError(f"invalid plugin directory name: {path.name!r}")
         plugins.append(path.name)
     return sorted(plugins)
+
+
+def repository_plugins(repository: Path) -> list[str]:
+    return plugin_directories(repository / "plugins")
+
+
+def _plugin_list(value: object, *, context: str, allow_empty: bool) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise PlanError(f"{context} must be an array of plugin names")
+    if not allow_empty and not value:
+        raise PlanError(f"{context} must not be empty")
+    invalid = sorted({item for item in value if not PLUGIN_NAME_RE.fullmatch(item)})
+    if invalid:
+        raise PlanError(f"{context} has invalid plugin names: {invalid!r}")
+    duplicates = sorted({item for item in value if value.count(item) > 1})
+    if duplicates:
+        raise PlanError(f"{context} has duplicate plugins: {duplicates!r}")
+    return value
+
+
+def planned_plugin_policy(matrix: object) -> dict[str, bool]:
+    """Resolve the canonical matrix into exact plugin/strictness policy."""
+    if not isinstance(matrix, dict) or set(matrix) != {"include"}:
+        raise PlanError("matrix must contain only an include array")
+    includes = matrix["include"]
+    if not isinstance(includes, list):
+        raise PlanError("matrix include must be an array")
+
+    policy = {}
+    shard_ids = []
+    flattened = []
+    for index, shard in enumerate(includes):
+        context = f"matrix include[{index}]"
+        if not isinstance(shard, dict) or set(shard) != {
+            "id",
+            "plugins",
+            "strict_plugins",
+        }:
+            raise PlanError(
+                f"{context} must contain exactly id, plugins, and strict_plugins"
+            )
+        shard_id = shard["id"]
+        if isinstance(shard_id, bool) or not isinstance(shard_id, int) or shard_id < 0:
+            raise PlanError(f"{context} id must be a non-negative integer")
+        shard_ids.append(shard_id)
+        plugins = _plugin_list(
+            shard["plugins"], context=f"{context} plugins", allow_empty=False
+        )
+        strict_plugins = _plugin_list(
+            shard["strict_plugins"],
+            context=f"{context} strict_plugins",
+            allow_empty=True,
+        )
+        outside = sorted(set(strict_plugins) - set(plugins))
+        if outside:
+            raise PlanError(
+                f"{context} strict_plugins are outside the shard: {outside!r}"
+            )
+        for plugin in plugins:
+            if plugin in policy:
+                raise PlanError(f"matrix repeats plugin across shards: {plugin!r}")
+            policy[plugin] = plugin in strict_plugins
+            flattened.append(plugin)
+
+    if shard_ids != list(range(len(includes))):
+        raise PlanError("matrix shard ids must be unique and sequential from zero")
+    if flattened != sorted(flattened):
+        raise PlanError("matrix plugins must be in canonical sorted order")
+    return policy
+
+
+def parse_matrix_json(value: str) -> dict[str, bool]:
+    if not value.strip():
+        raise PlanError("matrix JSON must not be empty")
+    try:
+        matrix = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise PlanError(f"invalid matrix JSON: {error}") from error
+    return planned_plugin_policy(matrix)
+
+
+def verify_staged_plugins(staged: Path, policy: dict[str, bool]) -> None:
+    """Require staged component directories to match the planned identities."""
+    expected = set(policy)
+    actual = set(plugin_directories(staged))
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    if missing or unexpected:
+        details = []
+        if missing:
+            details.append(f"missing staged plugins: {missing!r}")
+        if unexpected:
+            details.append(f"unexpected staged plugins: {unexpected!r}")
+        raise PlanError("; ".join(details))
 
 
 def git_changed_paths(repository: Path, base: str) -> list[str]:
@@ -178,7 +271,11 @@ def make_plan(
             for shard_id, shard in enumerate(shards)
         ]
     }
-    return {"matrix": matrix, "mode": mode, "count": len(selected)}
+    return {
+        "matrix": matrix,
+        "mode": mode,
+        "count": len(planned_plugin_policy(matrix)),
+    }
 
 
 def write_github_outputs(path: Path, plan: dict[str, object]) -> None:
@@ -199,6 +296,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--shard-size", type=int, default=DEFAULT_SHARD_SIZE)
     parser.add_argument("--max-shards", type=int, default=DEFAULT_MAX_SHARDS)
+    parser.add_argument("--matrix-json")
+    parser.add_argument("--verify-staged", type=Path)
     parser.add_argument("--output", type=Path, default=None)
     return parser.parse_args(argv)
 
@@ -209,6 +308,15 @@ def main(argv: list[str] | None = None) -> int:
     if output is None and os.environ.get("GITHUB_OUTPUT"):
         output = Path(os.environ["GITHUB_OUTPUT"])
     try:
+        if args.verify_staged is not None:
+            if args.matrix_json is None:
+                raise PlanError("--matrix-json is required with --verify-staged")
+            policy = parse_matrix_json(args.matrix_json)
+            verify_staged_plugins(args.verify_staged.resolve(), policy)
+            print(f"verified {len(policy)} planned staged plugin(s)")
+            return 0
+        if args.matrix_json is not None:
+            raise PlanError("--matrix-json requires --verify-staged")
         plan = make_plan(
             args.repository.resolve(),
             args.event,

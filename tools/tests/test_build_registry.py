@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -10,6 +11,9 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BUILD_REGISTRY = REPOSITORY_ROOT / "tools" / "build-registry.py"
 RELEASE_BASE = "https://example.invalid/releases/download/plugins"
+sys.path.insert(0, str(REPOSITORY_ROOT / "tools"))
+
+from registry_contract import PLUGIN_VERSION_RE  # noqa: E402
 
 
 def write_plugin(
@@ -39,10 +43,14 @@ def write_plugin(
     (plugin / "bridge.wasm").write_bytes(wasm)
 
 
-def run_registry(*arguments: object) -> subprocess.CompletedProcess:
+def run_registry(
+    *arguments: object,
+    environment: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(BUILD_REGISTRY), *(str(arg) for arg in arguments)],
         cwd=REPOSITORY_ROOT,
+        env=environment,
         check=False,
         capture_output=True,
         text=True,
@@ -140,6 +148,41 @@ class BuildRegistryTests(unittest.TestCase):
         self.assertIn("refusing to overwrite immutable package bridge@0.1.0", changed.stderr)
         self.assertIn("bump the manifest version", changed.stderr)
         self.assertFalse((collision / "bridge-0.1.0.zip").exists())
+
+    def test_archive_bytes_match_golden_packager_contract(self) -> None:
+        wasm = (
+            b"\x00" * 65_537
+            + bytes(range(256)) * 257
+            + b'(module (func (export "run")))\n' * 4_097
+            + b"".join(
+                hashlib.sha256(index.to_bytes(4, "big")).digest()
+                for index in range(4_096)
+            )
+        )
+        self.assertEqual(len(wasm), 389_408)
+
+        staged = self.root / "staged"
+        write_plugin(staged, wasm=wasm)
+        out = self.root / "out"
+        environment = os.environ.copy()
+        environment.pop("SOURCE_DATE_EPOCH", None)
+        result = run_registry(
+            "--staged",
+            staged,
+            "--release-base",
+            RELEASE_BASE,
+            "--out",
+            out,
+            environment=environment,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        archive = out / "bridge-0.1.0.zip"
+        self.assertEqual(archive.stat().st_size, 133_159)
+        self.assertEqual(
+            hashlib.sha256(archive.read_bytes()).hexdigest(),
+            "9aca4adc50bc7ae03b10d216dfa9206e104c73366c6f98564b9f9a9090b2afa8",
+        )
 
     def test_source_manifest_version_is_canonical_for_cargo(self) -> None:
         source = self.root / "plugins"
@@ -352,6 +395,28 @@ class BuildRegistryTests(unittest.TestCase):
                 "1.0.0+build",
             ],
         )
+
+    def test_version_contract_enforces_semver_numeric_identifiers(self) -> None:
+        valid = (
+            "0.0.0",
+            "1.2.3-0",
+            "1.2.3-alpha.1",
+            "1.2.3-alpha-01",
+            "1.2.3+001",
+        )
+        invalid = (
+            "01.2.3",
+            "1.02.3",
+            "1.2.03",
+            "1.2.3-01",
+            "1.2.3-alpha.01",
+        )
+        for version in valid:
+            with self.subTest(version=version):
+                self.assertIsNotNone(PLUGIN_VERSION_RE.fullmatch(version))
+        for version in invalid:
+            with self.subTest(version=version):
+                self.assertIsNone(PLUGIN_VERSION_RE.fullmatch(version))
 
     def test_package_rejects_symbolic_links(self) -> None:
         staged = self.root / "staged"

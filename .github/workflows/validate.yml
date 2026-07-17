@@ -125,7 +125,7 @@ jobs:
           done
           exit "$status"
       - name: Test immutable registry tooling
-        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
+        run: tools/ci/run-packager-python.sh -m unittest discover -s tools/tests -p 'test_*.py'
       - name: Test CI support tooling
         run: python3 -m unittest discover -s tools/ci/tests -p 'test_*.py'
       - name: Check generated registry history
@@ -147,12 +147,12 @@ jobs:
             base_commit=HEAD
           fi
           git show "${base_commit}:registry.json" > "$RUNNER_TEMP/base-registry.json"
-          python3 tools/build-registry.py \
+          tools/ci/run-packager-python.sh tools/build-registry.py \
             --source-plugins plugins \
             --check-history "$RUNNER_TEMP/base-registry.json" registry.json
       - name: Check generated registry metadata
         run: |
-          python3 tools/build-registry.py \
+          tools/ci/run-packager-python.sh tools/build-registry.py \
             --source-plugins plugins \
             --check-metadata registry.json
 
@@ -309,18 +309,23 @@ jobs:
           merge-multiple: true
       - name: Package and verify registry metadata
         shell: bash
+        env:
+          PLANNED_MATRIX_JSON: ${{ needs.changes.outputs.matrix }}
         run: |
           set -euo pipefail
           find staged -maxdepth 1 -type f -name 'ci-shard-*' -delete
+          python3 tools/ci/plan_matrix.py \
+            --matrix-json "$PLANNED_MATRIX_JSON" \
+            --verify-staged staged
           release_tag=$(python3 -c \
             'from tools.registry_contract import PLUGIN_RELEASE_TAG; print(PLUGIN_RELEASE_TAG)')
           release_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${release_tag}"
-          python3 tools/build-registry.py \
+          tools/ci/run-packager-python.sh tools/build-registry.py \
             --staged staged \
             --release-base "$release_base" \
             --existing-registry registry.json \
             --out dist
-          python3 tools/build-registry.py \
+          tools/ci/run-packager-python.sh tools/build-registry.py \
             --source-plugins staged \
             --check-metadata dist/registry.json
       - name: Upload registry dry run
@@ -355,6 +360,8 @@ jobs:
         id: summary
         if: always()
         shell: bash
+        env:
+          PLANNED_MATRIX_JSON: ${{ needs.changes.outputs.matrix }}
         run: |
           set -euo pipefail
           mode="${{ needs.changes.outputs.mode }}"
@@ -372,6 +379,7 @@ jobs:
             --event "${{ github.event_name }}" \
             --mode "$mode" \
             --count "$count" \
+            --matrix-json "$PLANNED_MATRIX_JSON" \
             "${reports[@]}" \
             | sed -E '/^\*\*Verdict:/d' >> "$GITHUB_STEP_SUMMARY"
       - name: Check required results

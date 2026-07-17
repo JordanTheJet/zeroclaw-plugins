@@ -87,6 +87,7 @@ REGISTRY_METADATA_FIELDS = (
     "sender_match",
 )
 REGISTRY_RELEASE_FIELDS = ("url", "sha256")
+ZIP_COMPRESSION_LEVEL = 6
 
 
 def zip_date_time() -> tuple:
@@ -501,9 +502,15 @@ def write_zip(zip_path: Path, package_files: dict[str, bytes], name: str) -> Non
             info = zipfile.ZipInfo(
                 f"{name}/{relative}", date_time=date_time
             )
+            info.create_system = 3
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            z.writestr(info, contents)
+            z.writestr(
+                info,
+                contents,
+                compress_type=zipfile.ZIP_DEFLATED,
+                compresslevel=ZIP_COMPRESSION_LEVEL,
+            )
 
 
 def main() -> None:

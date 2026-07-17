@@ -197,6 +197,56 @@ class MatrixPlanTests(unittest.TestCase):
         shards = plan_matrix.shard_plugins([f"p{index}" for index in range(17)])
         self.assertEqual([len(shard) for shard in shards], [8, 8, 1])
 
+    def test_matrix_is_the_exact_identity_and_strictness_policy(self) -> None:
+        matrix = {
+            "include": [
+                {"id": 0, "plugins": ["alpha", "bridge"], "strict_plugins": ["bridge"]},
+                {"id": 1, "plugins": ["charlie"], "strict_plugins": []},
+            ]
+        }
+        self.assertEqual(
+            plan_matrix.planned_plugin_policy(matrix),
+            {"alpha": False, "bridge": True, "charlie": False},
+        )
+
+    def test_matrix_rejects_duplicate_or_out_of_shard_strict_plugins(self) -> None:
+        invalid = (
+            {
+                "include": [
+                    {"id": 0, "plugins": ["bridge"], "strict_plugins": []},
+                    {"id": 1, "plugins": ["bridge"], "strict_plugins": []},
+                ]
+            },
+            {
+                "include": [
+                    {"id": 0, "plugins": ["bridge"], "strict_plugins": ["other"]}
+                ]
+            },
+        )
+        for matrix in invalid:
+            with self.subTest(matrix=matrix), self.assertRaises(plan_matrix.PlanError):
+                plan_matrix.planned_plugin_policy(matrix)
+
+    def test_staged_directories_must_match_the_matrix_exactly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            staged = Path(temp)
+            (staged / "alpha").mkdir()
+            (staged / "bridge").mkdir()
+            policy = {"alpha": False, "bridge": True}
+            plan_matrix.verify_staged_plugins(staged, policy)
+            (staged / "bridge").rmdir()
+            (staged / "decoy").mkdir()
+            with self.assertRaisesRegex(
+                plan_matrix.PlanError,
+                "missing staged plugins.*bridge.*unexpected staged plugins.*decoy",
+            ):
+                plan_matrix.verify_staged_plugins(staged, policy)
+
+    def test_matrix_json_fails_closed(self) -> None:
+        for value in ("", "not-json", '{"include":"not-an-array"}'):
+            with self.subTest(value=value), self.assertRaises(plan_matrix.PlanError):
+                plan_matrix.parse_matrix_json(value)
+
 
 class SummaryTests(unittest.TestCase):
     def test_renders_wasm_clippy_failure_and_large_artifact_warning(self) -> None:
@@ -235,7 +285,7 @@ class SummaryTests(unittest.TestCase):
             )
 
     def test_rejects_missing_and_duplicate_rows(self) -> None:
-        with self.assertRaisesRegex(report_schema.SchemaError, "planned 2"):
+        with self.assertRaisesRegex(report_schema.SchemaError, "missing report plugins: other"):
             summary.render_summary(
                 [valid_row()],
                 aggregate=True,
@@ -243,6 +293,7 @@ class SummaryTests(unittest.TestCase):
                 event="push",
                 mode="full",
                 expected_count=2,
+                planned_policy={"bridge": True, "other": False},
                 verdict="auto",
             )
         with self.assertRaisesRegex(report_schema.SchemaError, "duplicate plugin"):
@@ -253,6 +304,64 @@ class SummaryTests(unittest.TestCase):
                 event="push",
                 mode="full",
                 expected_count=2,
+                planned_policy={"bridge": True},
+                verdict="auto",
+            )
+
+    def test_rejects_equal_count_substitution_and_strictness_downgrade(self) -> None:
+        with self.assertRaisesRegex(
+            report_schema.SchemaError,
+            "missing report plugins: bridge; unexpected report plugins: decoy",
+        ):
+            summary.render_summary(
+                [valid_row(plugin="decoy", name="decoy")],
+                aggregate=True,
+                sha="a" * 40,
+                event="pull_request",
+                mode="changed",
+                expected_count=1,
+                planned_policy={"bridge": True},
+                verdict="auto",
+            )
+        with self.assertRaisesRegex(report_schema.SchemaError, "strictness"):
+            summary.render_summary(
+                [valid_row(strict="false")],
+                aggregate=True,
+                sha="a" * 40,
+                event="pull_request",
+                mode="changed",
+                expected_count=1,
+                planned_policy={"bridge": True},
+                verdict="auto",
+            )
+
+    def test_exact_multi_shard_identities_pass_in_any_report_order(self) -> None:
+        rendered = summary.render_summary(
+            [
+                valid_row(plugin="charlie", name="charlie", strict="false"),
+                valid_row(plugin="alpha", name="alpha", strict="false"),
+                valid_row(plugin="bridge", name="bridge", strict="true"),
+            ],
+            aggregate=True,
+            sha="a" * 40,
+            event="workflow_dispatch",
+            mode="full",
+            expected_count=3,
+            planned_policy={"alpha": False, "bridge": True, "charlie": False},
+            verdict="auto",
+        )
+        self.assertIn("**Verdict: PASS", rendered)
+
+    def test_workflow_count_must_match_matrix_identity_count(self) -> None:
+        with self.assertRaisesRegex(report_schema.SchemaError, "workflow count 2"):
+            summary.render_summary(
+                [valid_row()],
+                aggregate=True,
+                sha="a" * 40,
+                event="push",
+                mode="full",
+                expected_count=2,
+                planned_policy={"bridge": True},
                 verdict="auto",
             )
 
@@ -264,6 +373,7 @@ class SummaryTests(unittest.TestCase):
             event="pull_request",
             mode="changed",
             expected_count=0,
+            planned_policy={},
             verdict="pass",
         )
         self.assertIn("No plugin components required validation", rendered)
@@ -365,7 +475,7 @@ exit 0
         )
         return temp, root, report, staged, cargo_log, result
 
-    def test_runs_exact_checks_and_stages_only_registry_enabled_plugins(self) -> None:
+    def test_runs_exact_checks_and_stages_every_planned_plugin(self) -> None:
         temp, root, report, staged, cargo_log, result = self.run_validator(
             "redact-text", "amqp"
         )
@@ -376,7 +486,7 @@ exit 0
         self.assertEqual(rows[0]["tests_passed"], "3")
         self.assertEqual(rows[0]["wasm_clippy_rc"], "0")
         self.assertTrue((staged / "redact-text" / "redact_text.wasm").is_file())
-        self.assertFalse((staged / "amqp").exists())
+        self.assertTrue((staged / "amqp" / "amqp.wasm").is_file())
         invocations = cargo_log.read_text().splitlines()
         self.assertIn("test --locked", invocations)
         self.assertIn("clippy --locked --all-targets -- -D warnings", invocations)

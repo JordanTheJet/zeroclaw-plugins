@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from registry_contract import MAX_PLUGIN_ZIP_BYTES
+from plan_matrix import PlanError, parse_matrix_json
 from report_schema import SchemaError, read_reports
 
 
@@ -98,15 +99,41 @@ def render_summary(
     mode: str,
     expected_count: int | None,
     verdict: str,
+    planned_policy: dict[str, bool] | None = None,
 ) -> str:
     plugins = [row["plugin"] for row in rows]
     duplicates = sorted({plugin for plugin in plugins if plugins.count(plugin) > 1})
     if duplicates:
         raise SchemaError(f"duplicate plugin rows: {', '.join(duplicates)}")
-    if expected_count is not None and expected_count != len(rows):
-        raise SchemaError(
-            f"planned {expected_count} plugin rows but received {len(rows)}"
+    if planned_policy is not None:
+        expected_plugins = set(planned_policy)
+        actual_plugins = set(plugins)
+        missing = sorted(expected_plugins - actual_plugins)
+        unexpected = sorted(actual_plugins - expected_plugins)
+        if missing or unexpected:
+            details = []
+            if missing:
+                details.append(f"missing report plugins: {', '.join(missing)}")
+            if unexpected:
+                details.append(f"unexpected report plugins: {', '.join(unexpected)}")
+            raise SchemaError("; ".join(details))
+        strict_mismatches = sorted(
+            row["plugin"]
+            for row in rows
+            if (row["strict"] == "true") != planned_policy[row["plugin"]]
         )
+        if strict_mismatches:
+            raise SchemaError(
+                "report strictness does not match the planned matrix: "
+                + ", ".join(strict_mismatches)
+            )
+        if expected_count is not None and expected_count != len(planned_policy):
+            raise SchemaError(
+                f"workflow count {expected_count} does not match the matrix's "
+                f"{len(planned_policy)} plugin identities"
+            )
+    elif expected_count is not None and expected_count != len(rows):
+        raise SchemaError(f"planned {expected_count} plugin rows but received {len(rows)}")
     if aggregate:
         mismatched_sources = sorted(
             row["plugin"] for row in rows if row["source_head"] != sha
@@ -146,6 +173,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--event", default=os.environ.get("GITHUB_EVENT_NAME", "unknown"))
     parser.add_argument("--mode", choices=("changed", "full"), default="full")
     parser.add_argument("--count", type=int)
+    parser.add_argument("--matrix-json")
     parser.add_argument("--verdict", choices=("auto", "pass", "fail"), default="auto")
     parser.add_argument("--output", type=Path)
     return parser.parse_args(argv)
@@ -157,6 +185,13 @@ def main(argv: list[str] | None = None) -> int:
         print("error: count must be non-negative", file=sys.stderr)
         return 1
     try:
+        if args.aggregate and args.matrix_json is None:
+            raise SchemaError("--matrix-json is required with --aggregate")
+        planned_policy = (
+            parse_matrix_json(args.matrix_json)
+            if args.matrix_json is not None
+            else None
+        )
         rows = read_reports(args.reports)
         rendered = render_summary(
             rows,
@@ -165,9 +200,10 @@ def main(argv: list[str] | None = None) -> int:
             event=args.event,
             mode=args.mode,
             expected_count=args.count,
+            planned_policy=planned_policy,
             verdict=args.verdict,
         )
-    except SchemaError as error:
+    except (PlanError, SchemaError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
 
