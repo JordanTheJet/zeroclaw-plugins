@@ -147,7 +147,10 @@ the validated source as its parent and changes only `registry.json`, uploads
 that exact commit to a run-scoped temporary branch, and uses the run-scoped
 GitHub Actions token to attach a successful `Validate Required Gate` check.
 Only then does it fast-forward the same commit to `main`; the temporary ref is
-removed on exit. A workflow-token push does not recursively start a run.
+removed on exit with a SHA-bound lease. Cleanup is best-effort if the runner is
+terminated, so a stale `registry-publication/*` branch may be deleted after
+confirming that it is not used by an active publication run. A workflow-token
+push does not recursively start a run.
 
 ## Fork security boundary
 
