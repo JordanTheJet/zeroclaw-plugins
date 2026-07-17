@@ -31,7 +31,7 @@ mod component {
     use zeroclaw::plugin::ws_client::{self, WsEvent};
 
     const PLUGIN_NAME: &str = "nostr";
-    const PLUGIN_VERSION: &str = "0.1.0";
+    const PLUGIN_VERSION: &str = env!("CARGO_PKG_VERSION");
     const MAX_DRAIN_PER_POLL: usize = 200;
     const MAX_DRAIN_PER_RELAY: usize = 32;
     const SEEN_CAP: usize = 4096;
