@@ -13,6 +13,7 @@
 //! Build:  rustup target add wasm32-wasip2
 //!         cargo build --target wasm32-wasip2 --release
 
+// Keep the pure redaction core reusable by host-side tests and the wasm shim.
 pub mod redact;
 
 #[cfg(target_family = "wasm")]
