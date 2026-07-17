@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          ssh-key: ${{ secrets.REGISTRY_DEPLOY_KEY }}
       - name: Skip a superseded source revision
         id: freshness
         shell: bash
@@ -146,7 +147,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add registry.json
-          git commit -m "chore: refresh plugin registry index"
+          git commit -m "chore: refresh plugin registry index [skip ci]"
 
           # Retry only transient push failures. Generated registry bytes are
           # never rebased across a newer, unvalidated source revision.
