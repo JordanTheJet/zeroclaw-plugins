@@ -5,12 +5,17 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 repository_root=$(cd -- "$script_dir/../.." && pwd -P)
 image_file="$script_dir/packager-image.txt"
 
-mapfile -t image_lines < <(
+image=""
+image_count=0
+while IFS= read -r line; do
+  image=$line
+  image_count=$((image_count + 1))
+done < <(
   sed -E 's/[[:space:]]*#.*$//' "$image_file" \
     | sed -E '/^[[:space:]]*$/d; s/^[[:space:]]+//; s/[[:space:]]+$//'
 )
-if [[ "${#image_lines[@]}" -ne 1 \
-  || ! "${image_lines[0]}" =~ ^docker\.io/library/python@sha256:[0-9a-f]{64}$ ]]; then
+if [[ "$image_count" -ne 1 \
+  || ! "$image" =~ ^docker\.io/library/python@sha256:[0-9a-f]{64}$ ]]; then
   echo "error: $image_file must contain exactly one immutable official Python image digest" >&2
   exit 1
 fi
@@ -38,7 +43,7 @@ fi
 docker_args+=(
   --volume "$repository_root:/workspace"
   --workdir /workspace
-  "${image_lines[0]}"
+  "$image"
   python3
 )
 

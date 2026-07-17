@@ -151,6 +151,7 @@ class MatrixPlanTests(unittest.TestCase):
                     {
                         "id": 0,
                         "plugins": ["plugin-01"],
+                        "release_plugins": ["plugin-01"],
                         "strict_plugins": ["plugin-01"],
                     }
                 ]
@@ -171,6 +172,34 @@ class MatrixPlanTests(unittest.TestCase):
             [item["strict_plugins"] for item in plan["matrix"]["include"]],
             [["plugin-02"]],
         )
+        self.assertEqual(
+            [item["release_plugins"] for item in plan["matrix"]["include"]],
+            [["plugin-02"]],
+        )
+
+    def test_wit_change_marks_every_plugin_as_a_release_input(self) -> None:
+        temp, root = self.make_repository(3)
+        self.addCleanup(temp.cleanup)
+        with mock.patch.object(
+            plan_matrix,
+            "git_changed_paths",
+            return_value=["wit/v0/channel.wit"],
+        ):
+            plan = plan_matrix.make_plan(root, "pull_request", "origin/main")
+        shard = plan["matrix"]["include"][0]
+        self.assertEqual(shard["strict_plugins"], [])
+        self.assertEqual(shard["release_plugins"], shard["plugins"])
+
+    def test_wit_pin_alone_does_not_mark_components_as_release_inputs(self) -> None:
+        temp, root = self.make_repository(2)
+        self.addCleanup(temp.cleanup)
+        with mock.patch.object(
+            plan_matrix,
+            "git_changed_paths",
+            return_value=["wit/UPSTREAM_REF"],
+        ):
+            plan = plan_matrix.make_plan(root, "pull_request", "origin/main")
+        self.assertEqual(plan["matrix"]["include"][0]["release_plugins"], [])
 
     def test_workflow_tools_registry_and_wit_changes_force_full(self) -> None:
         for changed in (
@@ -197,29 +226,68 @@ class MatrixPlanTests(unittest.TestCase):
         shards = plan_matrix.shard_plugins([f"p{index}" for index in range(17)])
         self.assertEqual([len(shard) for shard in shards], [8, 8, 1])
 
-    def test_matrix_is_the_exact_identity_and_strictness_policy(self) -> None:
+    def test_matrix_is_the_exact_identity_strictness_and_release_policy(self) -> None:
         matrix = {
             "include": [
-                {"id": 0, "plugins": ["alpha", "bridge"], "strict_plugins": ["bridge"]},
-                {"id": 1, "plugins": ["charlie"], "strict_plugins": []},
+                {
+                    "id": 0,
+                    "plugins": ["alpha", "bridge"],
+                    "release_plugins": ["alpha"],
+                    "strict_plugins": ["bridge"],
+                },
+                {
+                    "id": 1,
+                    "plugins": ["charlie"],
+                    "release_plugins": [],
+                    "strict_plugins": [],
+                },
             ]
         }
         self.assertEqual(
             plan_matrix.planned_plugin_policy(matrix),
             {"alpha": False, "bridge": True, "charlie": False},
         )
+        self.assertEqual(
+            plan_matrix.planned_matrix_policies(matrix)[1],
+            {"alpha"},
+        )
 
     def test_matrix_rejects_duplicate_or_out_of_shard_strict_plugins(self) -> None:
         invalid = (
             {
                 "include": [
-                    {"id": 0, "plugins": ["bridge"], "strict_plugins": []},
-                    {"id": 1, "plugins": ["bridge"], "strict_plugins": []},
+                    {
+                        "id": 0,
+                        "plugins": ["bridge"],
+                        "release_plugins": [],
+                        "strict_plugins": [],
+                    },
+                    {
+                        "id": 1,
+                        "plugins": ["bridge"],
+                        "release_plugins": [],
+                        "strict_plugins": [],
+                    },
                 ]
             },
             {
                 "include": [
-                    {"id": 0, "plugins": ["bridge"], "strict_plugins": ["other"]}
+                    {
+                        "id": 0,
+                        "plugins": ["bridge"],
+                        "release_plugins": [],
+                        "strict_plugins": ["other"],
+                    }
+                ]
+            },
+            {
+                "include": [
+                    {
+                        "id": 0,
+                        "plugins": ["bridge"],
+                        "release_plugins": ["other"],
+                        "strict_plugins": [],
+                    }
                 ]
             },
         )

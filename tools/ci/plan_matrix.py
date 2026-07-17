@@ -60,8 +60,8 @@ def _plugin_list(value: object, *, context: str, allow_empty: bool) -> list[str]
     return value
 
 
-def planned_plugin_policy(matrix: object) -> dict[str, bool]:
-    """Resolve the canonical matrix into exact plugin/strictness policy."""
+def planned_matrix_policies(matrix: object) -> tuple[dict[str, bool], set[str]]:
+    """Resolve exact plugin, lint-strictness, and release-input policies."""
     if not isinstance(matrix, dict) or set(matrix) != {"include"}:
         raise PlanError("matrix must contain only an include array")
     includes = matrix["include"]
@@ -69,6 +69,7 @@ def planned_plugin_policy(matrix: object) -> dict[str, bool]:
         raise PlanError("matrix include must be an array")
 
     policy = {}
+    release_policy = set()
     shard_ids = []
     flattened = []
     for index, shard in enumerate(includes):
@@ -76,10 +77,12 @@ def planned_plugin_policy(matrix: object) -> dict[str, bool]:
         if not isinstance(shard, dict) or set(shard) != {
             "id",
             "plugins",
+            "release_plugins",
             "strict_plugins",
         }:
             raise PlanError(
-                f"{context} must contain exactly id, plugins, and strict_plugins"
+                f"{context} must contain exactly id, plugins, release_plugins, "
+                "and strict_plugins"
             )
         shard_id = shard["id"]
         if isinstance(shard_id, bool) or not isinstance(shard_id, int) or shard_id < 0:
@@ -93,32 +96,56 @@ def planned_plugin_policy(matrix: object) -> dict[str, bool]:
             context=f"{context} strict_plugins",
             allow_empty=True,
         )
-        outside = sorted(set(strict_plugins) - set(plugins))
-        if outside:
+        release_plugins = _plugin_list(
+            shard["release_plugins"],
+            context=f"{context} release_plugins",
+            allow_empty=True,
+        )
+        strict_outside = sorted(set(strict_plugins) - set(plugins))
+        if strict_outside:
             raise PlanError(
-                f"{context} strict_plugins are outside the shard: {outside!r}"
+                f"{context} strict_plugins are outside the shard: {strict_outside!r}"
+            )
+        release_outside = sorted(set(release_plugins) - set(plugins))
+        if release_outside:
+            raise PlanError(
+                f"{context} release_plugins are outside the shard: "
+                f"{release_outside!r}"
             )
         for plugin in plugins:
             if plugin in policy:
                 raise PlanError(f"matrix repeats plugin across shards: {plugin!r}")
             policy[plugin] = plugin in strict_plugins
             flattened.append(plugin)
+        release_policy.update(release_plugins)
 
     if shard_ids != list(range(len(includes))):
         raise PlanError("matrix shard ids must be unique and sequential from zero")
     if flattened != sorted(flattened):
         raise PlanError("matrix plugins must be in canonical sorted order")
-    return policy
+    return policy, release_policy
 
 
-def parse_matrix_json(value: str) -> dict[str, bool]:
+def planned_plugin_policy(matrix: object) -> dict[str, bool]:
+    """Resolve the canonical matrix into exact plugin/strictness policy."""
+    return planned_matrix_policies(matrix)[0]
+
+
+def _parse_matrix_document(value: str) -> object:
     if not value.strip():
         raise PlanError("matrix JSON must not be empty")
     try:
-        matrix = json.loads(value)
+        return json.loads(value)
     except json.JSONDecodeError as error:
         raise PlanError(f"invalid matrix JSON: {error}") from error
-    return planned_plugin_policy(matrix)
+
+
+def parse_matrix_json(value: str) -> dict[str, bool]:
+    return planned_plugin_policy(_parse_matrix_document(value))
+
+
+def parse_matrix_policies_json(value: str) -> tuple[dict[str, bool], set[str]]:
+    return planned_matrix_policies(_parse_matrix_document(value))
 
 
 def verify_staged_plugins(staged: Path, policy: dict[str, bool]) -> None:
@@ -259,6 +286,11 @@ def make_plan(
             paths = git_changed_paths(repository, base)
 
     strict = set(changed_plugins(paths, available))
+    release_all = any(
+        PurePosixPath(path).as_posix().removeprefix("./").startswith("wit/v0/")
+        for path in paths
+    )
+    release = set(available) if release_all else strict
 
     shards = shard_plugins(selected, shard_size=shard_size, max_shards=max_shards)
     matrix = {
@@ -266,6 +298,7 @@ def make_plan(
             {
                 "id": shard_id,
                 "plugins": shard,
+                "release_plugins": [plugin for plugin in shard if plugin in release],
                 "strict_plugins": [plugin for plugin in shard if plugin in strict],
             }
             for shard_id, shard in enumerate(shards)

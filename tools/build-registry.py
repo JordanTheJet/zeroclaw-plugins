@@ -28,10 +28,12 @@ canonical source manifests without rebuilding artifacts.
 
 Usage:
   build-registry.py --staged <dir> --release-base <url> --out <dir> \
-    [--existing-registry registry.json]
+    --matrix-json <json> [--existing-registry registry.json]
   build-registry.py --source-plugins plugins --check-metadata registry.json
   build-registry.py --source-plugins plugins --sync-metadata registry.json
   build-registry.py --check-history <base-registry.json> <candidate-registry.json>
+  build-registry.py --check-publication <base-registry.json> \
+    <candidate-registry.json> <dist-dir>
 """
 import argparse
 import hashlib
@@ -51,6 +53,13 @@ from registry_contract import (
     PLUGIN_VERSION_RE,
     WASM_PATH_RE,
     read_package_files,
+)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "ci"))
+from plan_matrix import (  # noqa: E402
+    PlanError,
+    parse_matrix_policies_json,
+    verify_staged_plugins,
 )
 
 try:
@@ -332,7 +341,7 @@ def check_registry_history(
 ) -> None:
     """Preserve release history and allow only canonical metadata refreshes."""
     try:
-        base, base_by_key = load_registry(base_path)
+        _, base_by_key = load_registry(base_path)
         candidate, candidate_by_key = load_registry(candidate_path)
     except ValueError as error:
         sys.exit(f"error: {error}")
@@ -392,6 +401,95 @@ def check_registry_history(
     print(
         f"registry preserves {len(base_by_key)} generated release entries "
         f"with {metadata_refreshes} canonical metadata refresh(es)"
+    )
+
+
+def check_publication_artifacts(
+    base_path: Path, candidate_path: Path, dist: Path
+) -> None:
+    """Require dist files to equal the candidate registry's immutable additions."""
+    try:
+        _, base_by_key = load_registry(base_path)
+        candidate, candidate_by_key = load_registry(candidate_path)
+    except ValueError as error:
+        sys.exit(f"error: {error}")
+
+    failures = []
+    for key, historical in base_by_key.items():
+        current = candidate_by_key.get(key)
+        if current is None:
+            failures.append(
+                f"publication candidate deleted {key[0]}@{key[1]}"
+            )
+        elif current != historical:
+            failures.append(
+                f"publication candidate changed existing {key[0]}@{key[1]}"
+            )
+
+    new_keys = candidate_by_key.keys() - base_by_key.keys()
+    expected_archives = {
+        f"{name}-{version}.zip": candidate_by_key[(name, version)]["sha256"]
+        for name, version in new_keys
+    }
+    expected_files = {"registry.json", *expected_archives}
+
+    try:
+        paths = list(dist.iterdir())
+    except OSError as error:
+        failures.append(f"cannot inspect publication directory {dist}: {error}")
+        paths = []
+    actual_files = set()
+    for path in paths:
+        actual_files.add(path.name)
+        if path.is_symlink() or not path.is_file():
+            failures.append(
+                f"publication entry must be a regular non-symbolic file: {path.name}"
+            )
+
+    missing = sorted(expected_files - actual_files)
+    unexpected = sorted(actual_files - expected_files)
+    if missing:
+        failures.append(f"publication files are missing: {missing!r}")
+    if unexpected:
+        failures.append(f"publication files are unexpected: {unexpected!r}")
+
+    expected_candidate = dist / "registry.json"
+    if candidate_path.absolute() != expected_candidate.absolute():
+        failures.append("candidate registry must be dist/registry.json")
+    try:
+        candidate_text = candidate_path.read_text()
+    except OSError as error:
+        failures.append(f"cannot reread publication candidate: {error}")
+    else:
+        if candidate_text != json.dumps(candidate, indent=2) + "\n":
+            failures.append("publication registry does not use canonical JSON formatting")
+        if candidate["plugins"] != sorted(candidate["plugins"], key=registry_entry_key):
+            failures.append("publication registry entries are not canonically ordered")
+
+    for archive_name, expected_sha in sorted(expected_archives.items()):
+        archive = dist / archive_name
+        if archive_name not in actual_files or archive.is_symlink() or not archive.is_file():
+            continue
+        if archive.stat().st_size > MAX_PLUGIN_ZIP_BYTES:
+            failures.append(
+                f"publication archive {archive_name} exceeds the host download cap"
+            )
+            continue
+        actual_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
+        if actual_sha != expected_sha:
+            failures.append(
+                f"publication archive {archive_name} sha256 {actual_sha} "
+                f"does not match ledger {expected_sha}"
+            )
+
+    if failures:
+        for failure in failures:
+            print(f"error: {failure}", file=sys.stderr)
+        sys.exit(1)
+
+    print(
+        f"verified exact publication set with {len(expected_archives)} new "
+        f"archive{'s' if len(expected_archives) != 1 else ''}"
     )
 
 
@@ -524,15 +622,45 @@ def main() -> None:
     )
     ap.add_argument("--source-plugins", help="canonical plugins source directory")
     ap.add_argument(
+        "--matrix-json",
+        help="canonical CI matrix defining exact staged identities and changed plugins",
+    )
+    ap.add_argument(
         "--check-history",
         nargs=2,
         metavar=("BASE", "CANDIDATE"),
         help="preserve BASE release history in CANDIDATE",
     )
+    ap.add_argument(
+        "--check-publication",
+        nargs=3,
+        metavar=("BASE", "CANDIDATE", "DIST"),
+        help="verify exact new archive files and digests from BASE to CANDIDATE",
+    )
     metadata_mode = ap.add_mutually_exclusive_group()
     metadata_mode.add_argument("--check-metadata", help="fail if registry metadata has drifted")
     metadata_mode.add_argument("--sync-metadata", help="rewrite registry metadata from manifests")
     args = ap.parse_args()
+
+    if args.check_publication:
+        if any(
+            (
+                args.staged,
+                args.release_base,
+                args.out,
+                args.existing_registry,
+                args.source_plugins,
+                args.check_history,
+                args.check_metadata,
+                args.sync_metadata,
+                args.matrix_json,
+            )
+        ):
+            ap.error("--check-publication cannot be combined with other modes")
+        check_publication_artifacts(
+            *(Path(path) for path in args.check_publication)
+        )
+        return
 
     if args.check_history:
         if any(
@@ -543,6 +671,8 @@ def main() -> None:
                 args.existing_registry,
                 args.check_metadata,
                 args.sync_metadata,
+                args.matrix_json,
+                args.check_publication,
             )
         ):
             ap.error("--check-history cannot be combined with packaging or metadata modes")
@@ -554,6 +684,8 @@ def main() -> None:
 
     metadata_registry = args.check_metadata or args.sync_metadata
     if metadata_registry:
+        if args.matrix_json:
+            ap.error("--matrix-json cannot be combined with metadata modes")
         if not args.source_plugins:
             ap.error("--source-plugins is required with metadata modes")
         sync_registry_metadata(
@@ -562,12 +694,26 @@ def main() -> None:
             check=bool(args.check_metadata),
         )
         return
-    if not args.staged or not args.release_base or not args.out:
-        ap.error("--staged, --release-base, and --out are required for packaging")
+    if not args.staged or not args.release_base or not args.out or not args.matrix_json:
+        ap.error(
+            "--staged, --release-base, --out, and --matrix-json are required "
+            "for packaging"
+        )
 
     staged = Path(args.staged)
     out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
+    try:
+        planned_policy, release_plugins = parse_matrix_policies_json(args.matrix_json)
+        verify_staged_plugins(staged.resolve(), planned_policy)
+    except PlanError as error:
+        sys.exit(f"error: {error}")
+    if out.exists() or out.is_symlink():
+        sys.exit(f"error: packaging output path must not already exist: {out}")
+    try:
+        out.mkdir(parents=True)
+    except OSError as error:
+        sys.exit(f"error: cannot create packaging output directory {out}: {error}")
+    print(f"verified {len(planned_policy)} planned staged plugin(s)")
 
     entries = []
     existing_by_key = {}
@@ -619,6 +765,27 @@ def main() -> None:
             continue
         seen.add((name, version))
 
+        existing_entry = existing_by_key.get((name, version))
+        if existing_entry is not None:
+            if registry_metadata_view(existing_entry) != manifest_registry_metadata(meta):
+                failures.append(
+                    f"{pdir.name}: registry metadata drift for existing package "
+                    f"{name}@{version}; synchronize metadata before publishing"
+                )
+                continue
+            if name in release_plugins:
+                failures.append(
+                    f"{pdir.name}: changed release input reuses immutable package identity "
+                    f"{name}@{version}; bump the canonical manifest version before "
+                    "publishing"
+                )
+                continue
+            print(
+                f"  reused immutable {name} v{version}  "
+                f"sha256={existing_entry['sha256'][:12]}…"
+            )
+            continue
+
         zip_name = f"{name}-{version}.zip"
         zip_path = out / zip_name
         write_zip(zip_path, package_files, name)
@@ -636,27 +803,6 @@ def main() -> None:
             "url": f"{args.release_base.rstrip('/')}/{zip_name}",
             "sha256": sha,
         }
-        existing_entry = existing_by_key.get((name, version))
-        if existing_entry is not None:
-            existing_sha = str(existing_entry.get("sha256", "")).removeprefix("sha256:")
-            zip_path.unlink(missing_ok=True)
-            if not existing_sha or existing_sha.lower() != sha.lower():
-                failures.append(
-                    f"{pdir.name}: refusing to overwrite immutable package "
-                    f"{name}@{version}: staged sha256 {sha} differs from registry "
-                    f"sha256 {existing_sha or '<missing>'}; bump the manifest version "
-                    "before publishing"
-                )
-                continue
-            if registry_metadata_view(existing_entry) != manifest_registry_metadata(meta):
-                failures.append(
-                    f"{pdir.name}: registry metadata drift for existing package "
-                    f"{name}@{version}; synchronize metadata before publishing"
-                )
-                continue
-            print(f"  verified existing {name} v{version}  sha256={sha[:12]}…")
-            continue
-
         entries.append(entry)
         print(f"  packaged {name} v{version}  sha256={sha[:12]}…")
 

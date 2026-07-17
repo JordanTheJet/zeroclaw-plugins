@@ -314,9 +314,6 @@ jobs:
         run: |
           set -euo pipefail
           find staged -maxdepth 1 -type f -name 'ci-shard-*' -delete
-          python3 tools/ci/plan_matrix.py \
-            --matrix-json "$PLANNED_MATRIX_JSON" \
-            --verify-staged staged
           release_tag=$(python3 -c \
             'from tools.registry_contract import PLUGIN_RELEASE_TAG; print(PLUGIN_RELEASE_TAG)')
           release_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${release_tag}"
@@ -324,10 +321,13 @@ jobs:
             --staged staged \
             --release-base "$release_base" \
             --existing-registry registry.json \
+            --matrix-json "$PLANNED_MATRIX_JSON" \
             --out dist
           tools/ci/run-packager-python.sh tools/build-registry.py \
             --source-plugins staged \
             --check-metadata dist/registry.json
+          tools/ci/run-packager-python.sh tools/build-registry.py \
+            --check-publication registry.json dist/registry.json dist
       - name: Upload registry dry run
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

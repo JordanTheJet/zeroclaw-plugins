@@ -62,6 +62,8 @@ jobs:
         run: |
           set -euo pipefail
           tools/ci/run-packager-python.sh tools/build-registry.py \
+            --check-publication registry.json dist/registry.json dist
+          tools/ci/run-packager-python.sh tools/build-registry.py \
             --source-plugins plugins \
             --check-metadata dist/registry.json
       - name: Publish zips to the release

@@ -77,10 +77,17 @@ fmt
 - `package` merges the staged shard artifacts and performs a dry-run registry
   build. The staged directory identities must exactly match the existing shard
   matrix before packaging; missing, substituted, or unexpected components fail
-  closed. Reusing an existing `<name>@<version>` with different bytes also
-  fails closed. The resulting `registry-dry-run` artifact is both available for
-  maintainer inspection and the sole input to publication; publication never
-  creates a second archive from the staged bytes.
+  closed. An unchanged historical identity reuses its immutable ledger entry
+  instead of assuming a newer compiler can reproduce old WASM. A plugin marked
+  as a changed release input by that same matrix may not reuse an existing
+  `<name>@<version>`; its canonical manifest version must advance. A vendored
+  WIT change marks every selected plugin as a release input, so a coordinated
+  ABI update cannot silently leave old packages behind. The resulting
+  `registry-dry-run` artifact is both available for maintainer inspection and
+  the sole input to publication; publication never creates a second archive
+  from the staged bytes. Generation requires a fresh output directory, and an
+  exact-set check rejects any file or digest not derived from newly added
+  ledger identities.
 - The gate always runs, aggregates shard results into the GitHub step summary,
   and requires report identities and strictness to match that same shard matrix
   exactly. It fails if any required dependency failed or was cancelled.

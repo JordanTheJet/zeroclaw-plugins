@@ -69,18 +69,43 @@ class BuildRegistryTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
-    def build(self, staged: Path, out: Path, existing: Path | None = None):
+    def build(
+        self,
+        staged: Path,
+        out: Path,
+        existing: Path | None = None,
+        *,
+        changed_plugins: tuple[str, ...] = (),
+        environment: dict[str, str] | None = None,
+    ):
+        plugins = sorted(path.name for path in staged.iterdir())
+        matrix = {
+            "include": (
+                [
+                    {
+                        "id": 0,
+                        "plugins": plugins,
+                        "release_plugins": list(changed_plugins),
+                        "strict_plugins": list(changed_plugins),
+                    }
+                ]
+                if plugins
+                else []
+            )
+        }
         arguments = [
             "--staged",
             staged,
             "--release-base",
             RELEASE_BASE,
+            "--matrix-json",
+            json.dumps(matrix, separators=(",", ":")),
             "--out",
             out,
         ]
         if existing is not None:
             arguments.extend(["--existing-registry", existing])
-        return run_registry(*arguments)
+        return run_registry(*arguments, environment=environment)
 
     def test_metadata_is_synchronized_from_canonical_manifest(self) -> None:
         source = self.root / "plugins"
@@ -143,10 +168,18 @@ class BuildRegistryTests(unittest.TestCase):
 
         (staged / "bridge" / "bridge.wasm").write_bytes(b"changed bytes")
         collision = self.root / "collision"
-        changed = self.build(staged, collision, initial / "registry.json")
+        changed = self.build(
+            staged,
+            collision,
+            initial / "registry.json",
+            changed_plugins=("bridge",),
+        )
         self.assertNotEqual(changed.returncode, 0)
-        self.assertIn("refusing to overwrite immutable package bridge@0.1.0", changed.stderr)
-        self.assertIn("bump the manifest version", changed.stderr)
+        self.assertIn(
+            "changed release input reuses immutable package identity bridge@0.1.0",
+            changed.stderr,
+        )
+        self.assertIn("bump the canonical manifest version", changed.stderr)
         self.assertFalse((collision / "bridge-0.1.0.zip").exists())
 
     def test_archive_bytes_match_golden_packager_contract(self) -> None:
@@ -166,15 +199,7 @@ class BuildRegistryTests(unittest.TestCase):
         out = self.root / "out"
         environment = os.environ.copy()
         environment.pop("SOURCE_DATE_EPOCH", None)
-        result = run_registry(
-            "--staged",
-            staged,
-            "--release-base",
-            RELEASE_BASE,
-            "--out",
-            out,
-            environment=environment,
-        )
+        result = self.build(staged, out, environment=environment)
         self.assertEqual(result.returncode, 0, result.stderr)
 
         archive = out / "bridge-0.1.0.zip"
@@ -183,6 +208,49 @@ class BuildRegistryTests(unittest.TestCase):
             hashlib.sha256(archive.read_bytes()).hexdigest(),
             "9aca4adc50bc7ae03b10d216dfa9206e104c73366c6f98564b9f9a9090b2afa8",
         )
+
+    def test_publication_files_exactly_match_new_ledger_identities(self) -> None:
+        base = self.root / "base.json"
+        base.write_text('{"plugins": []}\n')
+        staged = self.root / "staged"
+        write_plugin(staged)
+        dist = self.root / "dist"
+        built = self.build(staged, dist, base)
+        self.assertEqual(built.returncode, 0, built.stderr)
+
+        checked = run_registry(
+            "--check-publication", base, dist / "registry.json", dist
+        )
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+
+        unexpected = dist / "unindexed-9.9.9.zip"
+        unexpected.write_bytes(b"not in the ledger")
+        polluted = run_registry(
+            "--check-publication", base, dist / "registry.json", dist
+        )
+        self.assertNotEqual(polluted.returncode, 0)
+        self.assertIn("publication files are unexpected", polluted.stderr)
+        unexpected.unlink()
+
+        archive = dist / "bridge-0.1.0.zip"
+        archive.write_bytes(b"changed after generation")
+        tampered = run_registry(
+            "--check-publication", base, dist / "registry.json", dist
+        )
+        self.assertNotEqual(tampered.returncode, 0)
+        self.assertIn("does not match ledger", tampered.stderr)
+
+    def test_packaging_requires_a_fresh_output_path(self) -> None:
+        staged = self.root / "staged"
+        write_plugin(staged)
+        out = self.root / "out"
+        out.mkdir()
+        (out / "stale.zip").write_bytes(b"stale")
+
+        result = self.build(staged, out)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("output path must not already exist", result.stderr)
+        self.assertTrue((out / "stale.zip").is_file())
 
     def test_source_manifest_version_is_canonical_for_cargo(self) -> None:
         source = self.root / "plugins"
@@ -439,7 +507,7 @@ class BuildRegistryTests(unittest.TestCase):
 
         result = self.build(staged, self.root / "out")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("staged plugin must not be a symbolic link", result.stderr)
+        self.assertIn("plugin directory must not be a symbolic link", result.stderr)
 
     def test_package_rejects_wasm_path_traversal(self) -> None:
         staged = self.root / "staged"
