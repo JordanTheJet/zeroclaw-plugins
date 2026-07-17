@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -46,6 +47,10 @@ def run_registry(*arguments: object) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
     )
+
+
+def write_registry(path: Path, entries: list[dict]) -> None:
+    path.write_text(json.dumps({"plugins": entries}, indent=2) + "\n")
 
 
 class BuildRegistryTests(unittest.TestCase):
@@ -178,6 +183,230 @@ class BuildRegistryTests(unittest.TestCase):
             [("bridge", "0.1.0"), ("bridge", "0.2.0")],
         )
         self.assertTrue((updated / "bridge-0.2.0.zip").is_file())
+
+    def test_registry_history_is_append_only_and_canonically_ordered(self) -> None:
+        staged = self.root / "staged"
+        write_plugin(staged)
+        initial = self.root / "initial"
+        first = self.build(staged, initial)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        base = initial / "registry.json"
+
+        unchanged = run_registry("--check-history", base, base)
+        self.assertEqual(unchanged.returncode, 0, unchanged.stderr)
+
+        entry = json.loads(base.read_text())["plugins"][0]
+        entry_v2 = {
+            **entry,
+            "version": "0.2.0",
+            "url": f"{RELEASE_BASE}/bridge-0.2.0.zip",
+            "sha256": "1" * 64,
+        }
+        write_registry(base, [entry, entry_v2])
+        cases = {
+            "deleted": {"plugins": []},
+            "changed": {
+                "plugins": [
+                    {
+                        **entry,
+                        "url": "https://other.invalid/bridge-0.1.0.zip",
+                    },
+                    entry_v2,
+                ]
+            },
+            "reordered": {
+                "plugins": [entry_v2, entry]
+            },
+        }
+        for name, contents in cases.items():
+            with self.subTest(name=name):
+                candidate = self.root / f"{name}.json"
+                write_registry(candidate, contents["plugins"])
+                result = run_registry("--check-history", base, candidate)
+                self.assertNotEqual(result.returncode, 0)
+
+        appended = self.root / "appended.json"
+        entry_v3 = {
+            **entry,
+            "version": "0.3.0",
+            "url": f"{RELEASE_BASE}/bridge-0.3.0.zip",
+            "sha256": "2" * 64,
+        }
+        write_registry(
+            appended,
+            [entry, entry_v2, entry_v3],
+        )
+        addition = run_registry("--check-history", base, appended)
+        self.assertNotEqual(addition.returncode, 0)
+        self.assertIn("added outside the publication builder", addition.stderr)
+
+    def test_registry_loader_rejects_incomplete_or_unsafe_entries(self) -> None:
+        base = self.root / "base.json"
+        base.write_text('{"plugins": []}\n')
+
+        invalid_entries = {
+            "incomplete": {"name": "bridge", "version": "0.1.0"},
+            "unsafe-url": {
+                "name": "bridge",
+                "version": "0.1.0",
+                "capabilities": ["channel"],
+                "url": "http://example.invalid/bridge-0.1.0.zip",
+                "sha256": "0" * 64,
+            },
+            "unsafe-sha": {
+                "name": "bridge",
+                "version": "0.1.0",
+                "capabilities": ["channel"],
+                "url": f"{RELEASE_BASE}/bridge-0.1.0.zip",
+                "sha256": "not-a-digest",
+            },
+            "non-string-capability": {
+                "name": "bridge",
+                "version": "0.1.0",
+                "capabilities": [{"channel": True}],
+                "url": f"{RELEASE_BASE}/bridge-0.1.0.zip",
+                "sha256": "0" * 64,
+            },
+            "null-metadata": {
+                "name": "bridge",
+                "version": "0.1.0",
+                "description": None,
+                "capabilities": ["channel"],
+                "url": f"{RELEASE_BASE}/bridge-0.1.0.zip",
+                "sha256": "0" * 64,
+            },
+        }
+        for name, entry in invalid_entries.items():
+            with self.subTest(name=name):
+                candidate = self.root / f"{name}.json"
+                candidate.write_text(json.dumps({"plugins": [entry]}) + "\n")
+                result = run_registry("--check-history", base, candidate)
+                self.assertNotEqual(result.returncode, 0)
+
+    def test_history_allows_only_manifest_derived_metadata_refresh(self) -> None:
+        staged = self.root / "staged"
+        write_plugin(staged)
+        initial = self.root / "initial"
+        first = self.build(staged, initial)
+        self.assertEqual(first.returncode, 0, first.stderr)
+
+        manifest = staged / "bridge" / "manifest.toml"
+        manifest.write_text(
+            manifest.read_text().replace("Bridge messages", "Updated bridge")
+        )
+        candidate = self.root / "candidate.json"
+        entry = json.loads((initial / "registry.json").read_text())["plugins"][0]
+        write_registry(candidate, [{**entry, "description": "Updated bridge"}])
+
+        checked = run_registry(
+            "--source-plugins",
+            staged,
+            "--check-history",
+            initial / "registry.json",
+            candidate,
+        )
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_semver_order_places_prereleases_before_stable(self) -> None:
+        staged = self.root / "staged"
+        write_plugin(staged)
+        initial = self.root / "initial"
+        first = self.build(staged, initial)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        template = json.loads((initial / "registry.json").read_text())["plugins"][0]
+        versions = [
+            "1.0.0",
+            "1.0.0+build",
+            "1.0.0-alpha",
+            "1.0.0-alpha.1",
+            "1.0.0-beta",
+        ]
+        existing = self.root / "existing.json"
+        write_registry(
+            existing,
+            [
+                {
+                    **template,
+                    "version": version,
+                    "url": f"{RELEASE_BASE}/bridge-{version}.zip",
+                }
+                for version in versions
+            ],
+        )
+        empty = self.root / "empty"
+        empty.mkdir()
+        out = self.root / "ordered"
+        ordered = self.build(empty, out, existing)
+        self.assertEqual(ordered.returncode, 0, ordered.stderr)
+        actual = [
+            entry["version"]
+            for entry in json.loads((out / "registry.json").read_text())["plugins"]
+        ]
+        self.assertEqual(
+            actual,
+            [
+                "1.0.0-alpha",
+                "1.0.0-alpha.1",
+                "1.0.0-beta",
+                "1.0.0",
+                "1.0.0+build",
+            ],
+        )
+
+    def test_package_rejects_symbolic_links(self) -> None:
+        staged = self.root / "staged"
+        write_plugin(staged)
+        skills = staged / "bridge" / "skills"
+        skills.mkdir()
+        (skills / "outside.md").symlink_to(self.root / "outside.md")
+        (self.root / "outside.md").write_text("not package-owned\n")
+
+        result = self.build(staged, self.root / "out")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symbolic links are not allowed", result.stderr)
+
+    def test_package_rejects_symbolic_plugin_root(self) -> None:
+        external = self.root / "external"
+        write_plugin(external)
+        staged = self.root / "staged"
+        staged.mkdir()
+        (staged / "bridge").symlink_to(external / "bridge", target_is_directory=True)
+
+        result = self.build(staged, self.root / "out")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("staged plugin must not be a symbolic link", result.stderr)
+
+    def test_package_rejects_wasm_path_traversal(self) -> None:
+        staged = self.root / "staged"
+        write_plugin(staged)
+        manifest = staged / "bridge" / "manifest.toml"
+        manifest.write_text(
+            manifest.read_text().replace('"bridge.wasm"', '"../../outside.wasm"')
+        )
+        (self.root / "outside.wasm").write_bytes(b"outside")
+
+        result = self.build(staged, self.root / "out")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("safe relative .wasm filename", result.stderr)
+
+    def test_package_rejects_non_regular_entries(self) -> None:
+        staged = self.root / "staged"
+        write_plugin(staged)
+        os.mkfifo(staged / "bridge" / "named-pipe")
+
+        result = self.build(staged, self.root / "out")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("non-regular package entry", result.stderr)
+
+    def test_package_rejects_staged_directory_without_manifest(self) -> None:
+        staged = self.root / "staged"
+        plugin = staged / "bridge"
+        plugin.mkdir(parents=True)
+        (plugin / "bridge.wasm").write_bytes(b"wasm")
+
+        result = self.build(staged, self.root / "out")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("staged plugin is missing manifest.toml", result.stderr)
 
 
 if __name__ == "__main__":

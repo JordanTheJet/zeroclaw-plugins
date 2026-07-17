@@ -31,6 +31,7 @@ Usage:
     [--existing-registry registry.json]
   build-registry.py --source-plugins plugins --check-metadata registry.json
   build-registry.py --source-plugins plugins --sync-metadata registry.json
+  build-registry.py --check-history <base-registry.json> <candidate-registry.json>
 """
 import argparse
 import hashlib
@@ -41,17 +42,21 @@ import sys
 import time
 import zipfile
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from registry_contract import (
+    MAX_PLUGIN_EXTRACTED_BYTES,
+    MAX_PLUGIN_ZIP_BYTES,
+    PLUGIN_NAME_RE,
+    PLUGIN_VERSION_RE,
+    WASM_PATH_RE,
+    read_package_files,
+)
 
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
     sys.exit("error: build-registry.py requires Python 3.11+ (tomllib)")
-
-# Mirror the host's install caps (src/plugin_registry.rs MAX_PLUGIN_ZIP_BYTES /
-# MAX_PLUGIN_EXTRACTED_BYTES) so an oversized plugin fails the publish run
-# instead of every user's `zeroclaw plugin install`.
-MAX_ZIP_BYTES = 50 * 1024 * 1024
-MAX_EXTRACTED_BYTES = 50 * 1024 * 1024
 
 # The host's manifest schema (crates/zeroclaw-plugins/src/lib.rs). An unknown
 # value here makes the host reject the whole manifest at parse time, so catch
@@ -70,13 +75,6 @@ KNOWN_PERMISSIONS = {
 }
 KNOWN_SENDER_MATCH = {"exact", "case_insensitive", "handle", "email"}
 
-NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-VERSION_RE = re.compile(
-    r"^[0-9]+\.[0-9]+\.[0-9]+"
-    r"(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?"
-    r"(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$"
-)
-
 # `manifest.toml` is canonical. These are the manifest-owned fields projected
 # into registry entries; release-only `url` and `sha256` are added separately.
 REGISTRY_METADATA_FIELDS = (
@@ -88,6 +86,7 @@ REGISTRY_METADATA_FIELDS = (
     "provides",
     "sender_match",
 )
+REGISTRY_RELEASE_FIELDS = ("url", "sha256")
 
 
 def zip_date_time() -> tuple:
@@ -99,26 +98,87 @@ def zip_date_time() -> tuple:
 
 
 def version_key(version: str) -> tuple:
-    """Sort key making the newest numeric dotted version sort last."""
-    parts = []
-    for chunk in version.split("."):
-        m = re.match(r"^(\d+)", chunk)
-        parts.append((int(m.group(1)) if m else -1, chunk))
-    return tuple(parts)
+    """Deterministic SemVer-precedence key with stable releases last."""
+    without_build = version.split("+", 1)[0]
+    core, separator, prerelease = without_build.partition("-")
+    major, minor, patch = (int(part) for part in core.split("."))
+    prerelease_key = tuple(
+        (0, int(identifier)) if identifier.isdigit() else (1, identifier)
+        for identifier in prerelease.split(".")
+        if identifier
+    )
+    release_rank = 0 if separator else 1
+    # Build metadata has equal SemVer precedence. The original version is the
+    # deterministic tie-breaker for the canonical ledger order.
+    return (major, minor, patch, release_rank, prerelease_key, version)
 
 
-def validate(pdir: Path, meta: dict, *, require_wasm: bool = True) -> list:
-    """Check a plugin manifest against the host's install contract."""
+def registry_entry_key(entry: dict) -> tuple:
+    """Canonical registry ordering key used by checks and generation."""
+    return (entry["name"], version_key(entry["version"]))
+
+
+def validate_known_array(
+    meta: dict, field: str, known_values: set[str], *, required: bool
+) -> tuple[list[str], list[str]]:
+    """Validate one manifest array against its host-owned vocabulary."""
+    value = meta.get(field, [])
+    if not isinstance(value, list):
+        return [], [f"{field} must be an array"]
+    if required and not value:
+        return [], [f"{field} must be a non-empty array"]
+    if any(not isinstance(item, str) for item in value):
+        return [], [f"{field} must contain only strings"]
+    errors = [
+        f"unknown {field} value {item!r} (host rejects the manifest)"
+        for item in sorted(set(value) - known_values)
+    ]
+    return value, errors
+
+
+def validate_manifest_metadata(meta: dict, expected_name: str) -> list:
+    """Check manifest-owned metadata shared by source and registry views."""
     errors = []
     name = meta.get("name")
-    if not isinstance(name, str) or not NAME_RE.match(name or ""):
+    if not isinstance(name, str) or not PLUGIN_NAME_RE.fullmatch(name or ""):
         errors.append(f"name {name!r} must be a lowercase slug")
-    elif name != pdir.name:
-        errors.append(f"name {name!r} does not match staged directory {pdir.name!r}")
+    elif name != expected_name:
+        errors.append(f"name {name!r} does not match expected name {expected_name!r}")
 
     version = meta.get("version")
-    if not isinstance(version, str) or not VERSION_RE.fullmatch(version):
+    if not isinstance(version, str) or not PLUGIN_VERSION_RE.fullmatch(version):
         errors.append(f"version {version!r} must be a safe semantic version")
+
+    for field in ("description", "author", "provides", "sender_match"):
+        value = meta.get(field)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            errors.append(f"{field} must be a non-empty string when present")
+    sender_match = meta.get("sender_match")
+    if isinstance(sender_match, str) and sender_match not in KNOWN_SENDER_MATCH:
+        errors.append(
+            f"unknown sender_match {sender_match!r}; expected one of "
+            f"{sorted(KNOWN_SENDER_MATCH)!r}"
+        )
+
+    _, capability_errors = validate_known_array(
+        meta, "capabilities", KNOWN_CAPABILITIES, required=True
+    )
+    errors.extend(capability_errors)
+
+    return errors
+
+
+def validate(
+    pdir: Path,
+    meta: dict,
+    *,
+    require_wasm: bool = True,
+    package_files: dict[str, bytes] | None = None,
+) -> list:
+    """Check a plugin manifest against the host's install contract."""
+    errors = validate_manifest_metadata(meta, pdir.name)
+
+    version = meta.get("version")
 
     # `manifest.toml` owns the release identity. When validating a source tree,
     # fail if Cargo's build metadata would export a different package version.
@@ -136,70 +196,60 @@ def validate(pdir: Path, meta: dict, *, require_wasm: bool = True) -> list:
         except (OSError, tomllib.TOMLDecodeError) as error:
             errors.append(f"cannot validate Cargo.toml package.version: {error}")
 
-    for field in ("description", "author", "provides", "sender_match"):
-        value = meta.get(field)
-        if value is not None and (not isinstance(value, str) or not value.strip()):
-            errors.append(f"{field} must be a non-empty string when present")
-    sender_match = meta.get("sender_match")
-    if isinstance(sender_match, str) and sender_match not in KNOWN_SENDER_MATCH:
-        errors.append(
-            f"unknown sender_match {sender_match!r}; expected one of "
-            f"{sorted(KNOWN_SENDER_MATCH)!r}"
-        )
-
     registry = meta.get("registry", True)
     if not isinstance(registry, bool):
         errors.append("registry must be a boolean when present")
 
+    _, permission_errors = validate_known_array(
+        meta, "permissions", KNOWN_PERMISSIONS, required=False
+    )
+    errors.extend(permission_errors)
+
     caps = meta.get("capabilities")
     if not isinstance(caps, list):
         caps = []
-    if not caps:
-        errors.append("capabilities must be a non-empty array")
-    for cap in sorted(set(caps) - KNOWN_CAPABILITIES):
-        errors.append(f"unknown capability {cap!r} (host rejects the manifest)")
-
-    perms = meta.get("permissions", [])
-    if not isinstance(perms, list):
-        errors.append("permissions must be an array")
-        perms = []
-    for perm in sorted(set(perms) - KNOWN_PERMISSIONS):
-        errors.append(f"unknown permission {perm!r} (host rejects the manifest)")
-
+    else:
+        caps = [cap for cap in caps if isinstance(cap, str)]
     wasm_path = meta.get("wasm_path")
     needs_wasm = bool(set(caps) - {"skill"})
-    if needs_wasm and require_wasm:
-        if not wasm_path:
-            errors.append("wasm_path is required for non-skill-only plugins")
-        else:
-            wasm = pdir / wasm_path
-            if not wasm.is_file():
+    safe_wasm_path = isinstance(wasm_path, str) and bool(
+        WASM_PATH_RE.fullmatch(wasm_path)
+    )
+    if needs_wasm and not wasm_path:
+        errors.append("wasm_path is required for non-skill-only plugins")
+    elif wasm_path is not None and not safe_wasm_path:
+        errors.append("wasm_path must be a safe relative .wasm filename")
+    elif needs_wasm and require_wasm:
+        if safe_wasm_path:
+            if package_files is None:
+                package_files, package_errors = read_package_files(pdir)
+                errors.extend(package_errors)
+            wasm = package_files.get(wasm_path) if package_files is not None else None
+            if wasm is None:
                 errors.append(f"wasm_path {wasm_path!r} not found in staged dir")
-            elif wasm.stat().st_size == 0:
+            elif not wasm:
                 errors.append(f"wasm_path {wasm_path!r} is empty")
 
     if require_wasm:
-        extracted = sum(f.stat().st_size for f in pdir.rglob("*") if f.is_file())
-        if extracted > MAX_EXTRACTED_BYTES:
+        if package_files is None:
+            package_files, package_errors = read_package_files(pdir)
+            errors.extend(package_errors)
+        extracted = sum(len(contents) for contents in package_files.values())
+        if extracted > MAX_PLUGIN_EXTRACTED_BYTES:
             errors.append(
                 f"extracted size {extracted} exceeds the host's "
-                f"{MAX_EXTRACTED_BYTES}-byte install cap"
+                f"{MAX_PLUGIN_EXTRACTED_BYTES}-byte install cap"
             )
     return errors
 
 
 def manifest_registry_metadata(meta: dict) -> dict:
     """Project canonical manifest fields into one registry metadata view."""
-    entry = {
-        "name": meta["name"],
-        "version": meta["version"],
-        "description": meta.get("description"),
-        "author": meta.get("author"),
-        "capabilities": meta.get("capabilities", []),
-        "provides": meta.get("provides"),
-        "sender_match": meta.get("sender_match"),
+    return {
+        key: meta[key]
+        for key in REGISTRY_METADATA_FIELDS
+        if key in meta and meta[key] is not None
     }
-    return {key: value for key, value in entry.items() if value is not None}
 
 
 def registry_metadata_view(entry: dict) -> dict:
@@ -217,10 +267,13 @@ def load_registry(path: Path) -> tuple[dict, dict]:
         registry = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"cannot read registry {path}: {error}") from error
-    entries = registry.get("plugins") if isinstance(registry, dict) else None
+    if not isinstance(registry, dict) or set(registry) != {"plugins"}:
+        raise ValueError(f"registry {path} must contain only a plugins array")
+    entries = registry.get("plugins")
     if not isinstance(entries, list):
         raise ValueError(f"registry {path} must contain a plugins array")
 
+    allowed_fields = set(REGISTRY_METADATA_FIELDS) | {"url", "sha256"}
     by_key = {}
     for index, entry in enumerate(entries):
         if not isinstance(entry, dict):
@@ -229,6 +282,43 @@ def load_registry(path: Path) -> tuple[dict, dict]:
         version = entry.get("version")
         if not isinstance(name, str) or not isinstance(version, str):
             raise ValueError(f"registry entry {index} must have string name and version")
+        unexpected_fields = set(entry) - allowed_fields
+        if unexpected_fields:
+            raise ValueError(
+                f"registry entry {index} has unknown fields: {sorted(unexpected_fields)!r}"
+            )
+        null_fields = sorted(key for key, value in entry.items() if value is None)
+        if null_fields:
+            raise ValueError(
+                f"registry entry {index} has null fields that generation omits: "
+                f"{null_fields!r}"
+            )
+        metadata_errors = validate_manifest_metadata(entry, name)
+        if metadata_errors:
+            raise ValueError(
+                f"registry entry {index} is invalid: {'; '.join(metadata_errors)}"
+            )
+        url = entry.get("url")
+        parsed_url = urlsplit(url) if isinstance(url, str) else None
+        expected_asset = f"{name}-{version}.zip"
+        if (
+            parsed_url is None
+            or parsed_url.scheme != "https"
+            or not parsed_url.netloc
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or parsed_url.query
+            or parsed_url.fragment
+            or Path(parsed_url.path).name != expected_asset
+        ):
+            raise ValueError(
+                f"registry entry {index} must have an HTTPS url ending in {expected_asset}"
+            )
+        sha256 = entry.get("sha256")
+        if not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256):
+            raise ValueError(
+                f"registry entry {index} must have a lowercase 64-hex sha256"
+            )
         key = (name, version)
         if key in by_key:
             raise ValueError(f"registry {path} has duplicate entry {name}@{version}")
@@ -236,12 +326,85 @@ def load_registry(path: Path) -> tuple[dict, dict]:
     return registry, by_key
 
 
+def check_registry_history(
+    base_path: Path, candidate_path: Path, source_plugins: Path | None = None
+) -> None:
+    """Preserve release history and allow only canonical metadata refreshes."""
+    try:
+        base, base_by_key = load_registry(base_path)
+        candidate, candidate_by_key = load_registry(candidate_path)
+    except ValueError as error:
+        sys.exit(f"error: {error}")
+
+    failures = []
+    canonical_metadata = {}
+    if source_plugins is not None:
+        canonical_metadata, _, source_failures = source_manifest_metadata(source_plugins)
+        failures.extend(source_failures)
+
+    metadata_refreshes = 0
+    for (name, version), historical in base_by_key.items():
+        current = candidate_by_key.get((name, version))
+        if current is None:
+            failures.append(f"historical registry entry was deleted: {name}@{version}")
+            continue
+        if any(current[field] != historical[field] for field in REGISTRY_RELEASE_FIELDS):
+            failures.append(f"immutable release fields were changed: {name}@{version}")
+            continue
+        if current != historical:
+            expected = canonical_metadata.get((name, version))
+            if expected is None or registry_metadata_view(current) != expected:
+                failures.append(f"historical registry entry was changed: {name}@{version}")
+            else:
+                metadata_refreshes += 1
+
+    for name, version in sorted(candidate_by_key.keys() - base_by_key.keys()):
+        failures.append(
+            f"registry entry was added outside the publication builder: {name}@{version}"
+        )
+
+    expected_order = sorted(candidate["plugins"], key=registry_entry_key)
+    if candidate["plugins"] != expected_order:
+        failures.append("candidate registry entries are not in canonical name/version order")
+
+    for index, entry in enumerate(candidate["plugins"]):
+        expected_fields = [
+            field for field in REGISTRY_METADATA_FIELDS if field in entry
+        ] + list(REGISTRY_RELEASE_FIELDS)
+        if list(entry) != expected_fields:
+            failures.append(f"candidate registry entry {index} has non-canonical field order")
+
+    try:
+        candidate_text = candidate_path.read_text()
+    except OSError as error:
+        failures.append(f"cannot reread candidate registry {candidate_path}: {error}")
+    else:
+        canonical_text = json.dumps(candidate, indent=2) + "\n"
+        if candidate_text != canonical_text:
+            failures.append("candidate registry does not use canonical JSON formatting")
+
+    if failures:
+        for failure in failures:
+            print(f"error: {failure}", file=sys.stderr)
+        sys.exit(1)
+
+    print(
+        f"registry preserves {len(base_by_key)} generated release entries "
+        f"with {metadata_refreshes} canonical metadata refresh(es)"
+    )
+
+
 def source_manifest_metadata(source_plugins: Path) -> tuple[dict, set, list]:
     """Load current canonical source metadata, including registry opt-outs."""
     enabled = {}
     disabled = set()
     failures = []
-    for pdir in sorted(path for path in source_plugins.iterdir() if path.is_dir()):
+    for pdir in sorted(source_plugins.iterdir()):
+        if pdir.is_symlink():
+            failures.append(f"{pdir.name}: plugin directory must not be a symbolic link")
+            continue
+        if not pdir.is_dir():
+            continue
         manifest = pdir / "manifest.toml"
         if not manifest.exists():
             continue
@@ -304,11 +467,10 @@ def sync_registry_metadata(source_plugins: Path, registry_path: Path, *, check: 
 
     disabled_present = disabled & actual_by_key.keys()
     for key in sorted(disabled_present):
-        if check:
-            failures.append(f"registry=false plugin is indexed: {key[0]}@{key[1]}")
-        else:
-            registry["plugins"].remove(actual_by_key[key])
-            changed = True
+        failures.append(
+            f"registry=false plugin is already indexed: {key[0]}@{key[1]}; "
+            "publish a new source version instead of deleting history"
+        )
 
     if failures:
         for failure in failures:
@@ -331,19 +493,17 @@ def sync_registry_metadata(source_plugins: Path, registry_path: Path, *, check: 
         print(f"  pending unpublished source: {name}@{version}")
 
 
-def write_zip(zip_path: Path, pdir: Path, name: str) -> None:
-    """Zip `pdir` under a top-level `<name>/`, reproducibly."""
+def write_zip(zip_path: Path, package_files: dict[str, bytes], name: str) -> None:
+    """Zip materialized package bytes under `<name>/`, reproducibly."""
     date_time = zip_date_time()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in sorted(pdir.rglob("*")):
-            if not f.is_file():
-                continue
+        for relative, contents in sorted(package_files.items()):
             info = zipfile.ZipInfo(
-                f"{name}/{f.relative_to(pdir).as_posix()}", date_time=date_time
+                f"{name}/{relative}", date_time=date_time
             )
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            z.writestr(info, f.read_bytes())
+            z.writestr(info, contents)
 
 
 def main() -> None:
@@ -356,10 +516,34 @@ def main() -> None:
         help="immutable registry history to merge; changed name/version pairs fail",
     )
     ap.add_argument("--source-plugins", help="canonical plugins source directory")
+    ap.add_argument(
+        "--check-history",
+        nargs=2,
+        metavar=("BASE", "CANDIDATE"),
+        help="preserve BASE release history in CANDIDATE",
+    )
     metadata_mode = ap.add_mutually_exclusive_group()
     metadata_mode.add_argument("--check-metadata", help="fail if registry metadata has drifted")
     metadata_mode.add_argument("--sync-metadata", help="rewrite registry metadata from manifests")
     args = ap.parse_args()
+
+    if args.check_history:
+        if any(
+            (
+                args.staged,
+                args.release_base,
+                args.out,
+                args.existing_registry,
+                args.check_metadata,
+                args.sync_metadata,
+            )
+        ):
+            ap.error("--check-history cannot be combined with packaging or metadata modes")
+        check_registry_history(
+            *(Path(path) for path in args.check_history),
+            Path(args.source_plugins) if args.source_plugins else None,
+        )
+        return
 
     metadata_registry = args.check_metadata or args.sync_metadata
     if metadata_registry:
@@ -388,13 +572,23 @@ def main() -> None:
         entries.extend(existing["plugins"])
     failures = []
     seen = set()
-    for pdir in sorted(p for p in staged.iterdir() if p.is_dir()):
-        manifest = pdir / "manifest.toml"
-        if not manifest.exists():
+    for pdir in sorted(staged.iterdir()):
+        if pdir.is_symlink():
+            failures.append(f"{pdir.name}: staged plugin must not be a symbolic link")
+            continue
+        if not pdir.is_dir():
+            continue
+        package_files, package_errors = read_package_files(pdir)
+        if package_errors:
+            failures.extend(f"{pdir.name}: {error}" for error in package_errors)
+            continue
+        manifest_bytes = package_files.get("manifest.toml")
+        if manifest_bytes is None:
+            failures.append(f"{pdir.name}: staged plugin is missing manifest.toml")
             continue
         try:
-            meta = tomllib.loads(manifest.read_text())
-        except tomllib.TOMLDecodeError as e:
+            meta = tomllib.loads(manifest_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, tomllib.TOMLDecodeError) as e:
             failures.append(f"{pdir.name}: invalid manifest.toml: {e}")
             continue
 
@@ -406,7 +600,7 @@ def main() -> None:
             print(f"  skipping {pdir.name} (registry = false: host-gated source)")
             continue
 
-        errors = validate(pdir, meta)
+        errors = validate(pdir, meta, package_files=package_files)
         if errors:
             failures.extend(f"{pdir.name}: {e}" for e in errors)
             continue
@@ -420,12 +614,12 @@ def main() -> None:
 
         zip_name = f"{name}-{version}.zip"
         zip_path = out / zip_name
-        write_zip(zip_path, pdir, name)
+        write_zip(zip_path, package_files, name)
 
-        if zip_path.stat().st_size > MAX_ZIP_BYTES:
+        if zip_path.stat().st_size > MAX_PLUGIN_ZIP_BYTES:
             failures.append(
                 f"{pdir.name}: zip size {zip_path.stat().st_size} exceeds the "
-                f"host's {MAX_ZIP_BYTES}-byte download cap"
+                f"host's {MAX_PLUGIN_ZIP_BYTES}-byte download cap"
             )
             continue
 
@@ -465,7 +659,7 @@ def main() -> None:
         sys.exit(1)
 
     # Host install-by-name takes the last matching entry: newest must sort last.
-    entries.sort(key=lambda e: (e["name"], version_key(e["version"])))
+    entries.sort(key=registry_entry_key)
 
     tmp = out / "registry.json.tmp"
     tmp.write_text(json.dumps({"plugins": entries}, indent=2) + "\n")
