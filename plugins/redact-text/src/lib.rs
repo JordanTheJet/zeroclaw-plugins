@@ -15,6 +15,10 @@
 
 pub mod redact;
 
+pub fn clippy_warning_probe() -> String {
+    format!("{}", "clippy-warning-proof")
+}
+
 #[cfg(target_family = "wasm")]
 mod component {
     wit_bindgen::generate!({
